@@ -3,10 +3,16 @@
 **Feature:** A web UI to onboard new customer API connections (Crunchtime / MenuWorks) and configure
 the SMTP "what changed" email — replacing hand-editing `.env` + `connectors.yaml`.
 **Ticket:** TBD
-**Status:** 🟢 Phases 1–2 built + live-proven 2026-06-30 (login, connections CRUD, encrypted
-secrets, live `test` endpoint against Compass Prod). Decisions locked: **single `ADMIN_TOKEN` +
-login page**; **layering** (DB connections win, `.env` fallback). Remaining: SMTP test (TC-024),
-FE→API wiring (Phase 4), deploy `inventory-web` (Phase 5).
+**Status:** 🟢 Phases 1–2 + **5 deployed live** 2026-06-30. Login, connections CRUD, encrypted
+secrets, live `test` endpoint (Compass Prod 200), and the web service are all proven in production.
+Decisions locked: **single `ADMIN_TOKEN` + login page**; **layering** (DB connections win, `.env`
+fallback). Remaining: SMTP test (TC-024), FE→API wiring (Phase 4).
+
+### Deployment (live)
+- **URL:** https://inventory-web-production-c606.up.railway.app  (`/login` → token from `.env` `ADMIN_TOKEN`)
+- **Project:** `Inventory API` — services: `Postgres` · `inventory-sync` (ELT, idle until scoped) · `inventory-web` (this console)
+- **One image, two roles:** `entrypoint.sh` switches on `SERVICE_ROLE` (`web`=uvicorn, `sync`=ELT). `railway.json` is build-only; cron deferred until the sync command is per-connector scoped via `SYNC_DOMAINS`.
+- **Web service vars:** `SERVICE_ROLE=web`, `APP_SECRET_KEY`, `SESSION_SECRET`, `ADMIN_TOKEN`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
 **Date:** 2026-06-30
 **Stack:** Python (FastAPI) backend + static HTML/JS frontend, PostgreSQL, Railway
 **Sample:** [`setup-console.sample.html`](setup-console.sample.html) (rendered as an Artifact)
