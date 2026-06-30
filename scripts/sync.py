@@ -153,9 +153,15 @@ def main(argv=None) -> int:
     if args.smoke:
         cfg = get_config(args.connector)
         client = make_client(args.connector)
+        # Build paging params defensively: connectors with non page/size paging
+        # (e.g. MenuWorks options_json) have no page_param/size_param keys.
+        smoke_params = {}
+        for key in ("page_param", "size_param"):
+            param_name = client.paging.get(key)
+            if param_name:
+                smoke_params[param_name] = 1
         try:
-            client.get(cfg.get("smoke_path", "/"), {client.paging["page_param"]: 1,
-                                                    client.paging["size_param"]: 1})
+            client.get(cfg.get("smoke_path", "/"), smoke_params)
         except ApiError as e:
             log.error("SMOKE FAILED — %s", e)
             return 1
