@@ -26,7 +26,10 @@ DATABASE_URL     — psycopg2 DSN (used by db.connect())
 """
 from __future__ import annotations
 
+import csv
 import datetime as dt
+import io
+import json
 import logging
 import os
 import secrets
@@ -41,8 +44,10 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.sql
+import yaml
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -50,6 +55,26 @@ import db as _db
 import secrets_box  # encrypt/decrypt/mask helpers
 
 log = logging.getLogger("web.app")
+
+# ── Data whitelist: domain -> raw_table (loaded from endpoints.yaml) ─────────
+def _load_dataset_whitelist() -> dict[str, str]:
+    """Return {domain_name: raw_table} for every domain that declares raw_table."""
+    ep_path = SCRIPTS_DIR / "endpoints.yaml"
+    try:
+        with ep_path.open() as fh:
+            data = yaml.safe_load(fh)
+        whitelist: dict[str, str] = {}
+        for domain in data.get("domains", []):
+            name = domain.get("name")
+            raw_table = domain.get("raw_table")
+            if name and raw_table:
+                whitelist[name] = raw_table
+        return whitelist
+    except Exception as exc:
+        log.warning("Failed to load endpoints.yaml for data whitelist: %s", exc)
+        return {}
+
+_DATASET_WHITELIST: dict[str, str] = _load_dataset_whitelist()
 
 # ── app factory ───────────────────────────────────────────────────────────────
 app = FastAPI(title="Inventory API — Setup Console", docs_url=None, redoc_url=None)
@@ -618,3 +643,222 @@ async def test_smtp(request: Request):
         db_conn.close()
 
     return JSONResponse({"status": status, "detail": detail})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Data API  — view synced raw.* tables
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _flatten_payload(payload) -> dict:
+    """Flatten a JSONB payload dict: scalars pass through, dicts/lists → JSON string."""
+    if not isinstance(payload, dict):
+        return {}
+    out = {}
+    for k, v in payload.items():
+        if isinstance(v, (dict, list)):
+            out[k] = json.dumps(v, default=str)
+        else:
+            out[k] = v
+    return out
+
+
+def _table_identifier(raw_table: str) -> psycopg2.sql.Composed:
+    """Return a safe psycopg2 SQL object for a schema-qualified table name."""
+    schema, _, name = raw_table.partition(".")
+    return psycopg2.sql.SQL("{}.{}").format(
+        psycopg2.sql.Identifier(schema),
+        psycopg2.sql.Identifier(name),
+    )
+
+
+@app.get("/api/data/datasets")
+async def list_datasets(request: Request):
+    """Return [{dataset, table, count}] for every whitelisted domain."""
+    guard = _require_api_auth(request)
+    if guard:
+        return guard
+
+    result = []
+    for domain_name in sorted(_DATASET_WHITELIST):
+        raw_table = _DATASET_WHITELIST[domain_name]
+        count = 0
+        db_conn = None
+        try:
+            db_conn = _db.connect()
+            tbl = _table_identifier(raw_table)
+            with db_conn.cursor() as cur:
+                cur.execute(psycopg2.sql.SQL("SELECT count(*) FROM {}").format(tbl))
+                row = cur.fetchone()
+                count = row[0] if row else 0
+        except psycopg2.errors.UndefinedTable:
+            if db_conn:
+                db_conn.rollback()
+            count = 0
+        except Exception as exc:
+            log.warning("list_datasets count failed for %s: %s", raw_table, exc)
+            if db_conn:
+                try:
+                    db_conn.rollback()
+                except Exception:
+                    pass
+            count = 0
+        finally:
+            if db_conn:
+                db_conn.close()
+        result.append({"dataset": domain_name, "table": raw_table, "count": count})
+
+    return JSONResponse(result)
+
+
+@app.get("/api/data/{dataset}/preview")
+async def preview_dataset(dataset: str, request: Request, limit: int = 50):
+    """Return {columns, rows} for the first N rows of a whitelisted dataset."""
+    guard = _require_api_auth(request)
+    if guard:
+        return guard
+
+    raw_table = _DATASET_WHITELIST.get(dataset)
+    if raw_table is None:
+        return JSONResponse({"detail": "dataset not found"}, status_code=404)
+
+    limit = max(1, min(limit, 500))
+
+    rows_raw = []
+    db_conn = None
+    try:
+        db_conn = _db.connect()
+        tbl = _table_identifier(raw_table)
+        with db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                psycopg2.sql.SQL(
+                    "SELECT natural_key, payload, ingested_at FROM {} "
+                    "ORDER BY ingested_at DESC NULLS LAST LIMIT %s"
+                ).format(tbl),
+                (limit,),
+            )
+            rows_raw = cur.fetchall()
+    except psycopg2.errors.UndefinedTable:
+        if db_conn:
+            db_conn.rollback()
+        return JSONResponse({"columns": [], "rows": []})
+    except Exception as exc:
+        log.warning("preview_dataset %s failed: %s", dataset, exc)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except Exception:
+                pass
+        return JSONResponse({"columns": [], "rows": []})
+    finally:
+        if db_conn:
+            db_conn.close()
+
+    if not rows_raw:
+        return JSONResponse({"columns": [], "rows": []})
+
+    # Collect union of payload keys across all rows
+    payload_keys: set[str] = set()
+    for r in rows_raw:
+        p = r["payload"] if isinstance(r["payload"], dict) else {}
+        payload_keys.update(p.keys())
+
+    columns = ["natural_key"] + sorted(payload_keys) + ["ingested_at"]
+
+    out_rows = []
+    for r in rows_raw:
+        flat = _flatten_payload(r["payload"] if isinstance(r["payload"], dict) else {})
+        row_dict: dict = {"natural_key": r["natural_key"]}
+        row_dict.update(flat)
+        ts = r["ingested_at"]
+        row_dict["ingested_at"] = ts.isoformat() if ts is not None else None
+        out_rows.append(row_dict)
+
+    return JSONResponse({"columns": columns, "rows": out_rows})
+
+
+@app.get("/api/data/{dataset}/export.csv")
+async def export_dataset_csv(dataset: str, request: Request):
+    """Stream all rows of a whitelisted dataset as a CSV download."""
+    guard = _require_api_auth(request)
+    if guard:
+        return guard
+
+    raw_table = _DATASET_WHITELIST.get(dataset)
+    if raw_table is None:
+        return JSONResponse({"detail": "dataset not found"}, status_code=404)
+
+    _empty_csv = StreamingResponse(
+        iter([""]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{dataset}.csv"'},
+    )
+
+    payload_keys: set[str] = set()
+    buffered: list[dict] = []
+    db_conn = None
+    try:
+        db_conn = _db.connect()
+        tbl = _table_identifier(raw_table)
+        # Use a named server-side cursor for large tables
+        with db_conn.cursor(name="csv_export", cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                psycopg2.sql.SQL(
+                    "SELECT natural_key, payload, ingested_at FROM {} "
+                    "ORDER BY ingested_at DESC NULLS LAST"
+                ).format(tbl)
+            )
+            while True:
+                batch = cur.fetchmany(500)
+                if not batch:
+                    break
+                for r in batch:
+                    p = r["payload"] if isinstance(r["payload"], dict) else {}
+                    payload_keys.update(p.keys())
+                    buffered.append(dict(r))
+    except psycopg2.errors.UndefinedTable:
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except Exception:
+                pass
+            db_conn.close()
+        return _empty_csv
+    except Exception as exc:
+        log.warning("export_dataset_csv %s failed: %s", dataset, exc)
+        if db_conn:
+            try:
+                db_conn.rollback()
+            except Exception:
+                pass
+            db_conn.close()
+        return _empty_csv
+    finally:
+        if db_conn:
+            try:
+                db_conn.close()
+            except Exception:
+                pass
+
+    columns = ["natural_key"] + sorted(payload_keys) + ["ingested_at"]
+
+    def generate():
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore", lineterminator="\r\n")
+        writer.writeheader()
+        yield buf.getvalue()
+        for r in buffered:
+            flat = _flatten_payload(r["payload"] if isinstance(r["payload"], dict) else {})
+            row_dict: dict = {"natural_key": r["natural_key"]}
+            row_dict.update(flat)
+            ts = r["ingested_at"]
+            row_dict["ingested_at"] = ts.isoformat() if ts is not None else None
+            buf2 = io.StringIO()
+            writer2 = csv.DictWriter(buf2, fieldnames=columns, extrasaction="ignore", lineterminator="\r\n")
+            writer2.writerow(row_dict)
+            yield buf2.getvalue()
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{dataset}.csv"'},
+    )

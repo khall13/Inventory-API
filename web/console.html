@@ -145,6 +145,20 @@
   .callout svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 1px; }
   .callout b { font-weight: 650; }
 
+  /* data panel */
+  .ds-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .ds-chip { font-family: var(--mono); font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--ink-2); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+  .ds-chip:hover { background: var(--copper-tint); border-color: var(--copper); color: var(--copper-dk); }
+  .ds-chip.on { background: var(--copper-tint); border-color: var(--copper); color: var(--copper-dk); font-weight: 600; }
+  .ds-count { font-size: 11px; color: var(--ink-3); margin-left: 5px; }
+  .ds-chip.on .ds-count { color: var(--copper); }
+  .data-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .data-caption { font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+  .data-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); }
+  .data-table-wrap table { min-width: 600px; }
+  .data-table-wrap thead th { position: sticky; top: 0; z-index: 1; }
+  #dataPreviewBox { max-height: 480px; overflow-y: auto; }
+
   /* empty / loading state */
   .empty-state { padding: 40px 28px; text-align: center; color: var(--ink-3); font-size: 13px; }
   .empty-state p { margin-top: 6px; }
@@ -189,6 +203,10 @@
       <button class="nav-item" data-panel="schedule">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         Schedule
+      </button>
+      <button class="nav-item" data-panel="data">
+        <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="1.8"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="currentColor" stroke-width="1.8"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" stroke="currentColor" stroke-width="1.8"/></svg>
+        Data
       </button>
     </nav>
     <div class="side-foot">
@@ -327,6 +345,38 @@
       </div>
     </section>
 
+    <!-- ════ DATA ════ -->
+    <section class="panel" id="panel-data">
+      <div class="phead">
+        <div>
+          <div class="eyebrow">Synced records</div>
+          <h2>Data</h2>
+          <p>Browse records landed in each raw dataset. Select a dataset to preview the most recent 50 rows, or download the full table as CSV.</p>
+        </div>
+      </div>
+
+      <div id="dsChipsWrap" class="ds-chips">
+        <span class="data-caption" id="dsChipsLoading">Loading datasets…</span>
+      </div>
+
+      <div id="dataPreviewSection" hidden>
+        <div class="data-toolbar">
+          <span class="data-caption" id="dataCaption"></span>
+          <a id="csvDownloadBtn" class="btn" href="#" download>
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Download CSV
+          </a>
+        </div>
+        <div id="dataPreviewBox" class="data-table-wrap">
+          <div class="empty-state" id="dataPreviewEmpty" hidden>No rows found for this dataset.</div>
+          <table id="dataPreviewTable" hidden>
+            <thead id="dataPreviewHead"></thead>
+            <tbody id="dataPreviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- ════ SCHEDULE ════ -->
     <section class="panel" id="panel-schedule">
       <div class="phead">
@@ -388,7 +438,7 @@ function toast(msg, isError = false) {
 // ══════════════════════════════════════════════════════════════════
 // nav
 // ══════════════════════════════════════════════════════════════════
-const titles = { connections: 'Connections', email: 'Email (SMTP)', schedule: 'Schedule' };
+const titles = { connections: 'Connections', email: 'Email (SMTP)', schedule: 'Schedule', data: 'Data' };
 document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nav-item').forEach(b => { b.classList.remove('on'); b.removeAttribute('aria-current'); });
@@ -398,6 +448,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     document.getElementById('panel-' + p).classList.add('on');
     document.getElementById('topTitle').textContent = titles[p];
     if (p === 'email') loadSmtp();
+    if (p === 'data') loadDatasets();
   });
 });
 
@@ -863,6 +914,101 @@ document.getElementById('smtpTestBtn').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+// ══════════════════════════════════════════════════════════════════
+// DATA PANEL
+// ══════════════════════════════════════════════════════════════════
+let _datasetsLoaded = false;
+let _activeDataset = null;
+
+async function loadDatasets() {
+  if (_datasetsLoaded) return;
+  const wrap = document.getElementById('dsChipsWrap');
+  wrap.innerHTML = '<span class="data-caption" id="dsChipsLoading">Loading datasets…</span>';
+  try {
+    const res = await apiFetch('/api/data/datasets');
+    if (!res.ok) throw new Error(await res.text());
+    const list = await res.json();
+    wrap.innerHTML = '';
+    if (!list.length) {
+      wrap.innerHTML = '<span class="data-caption">No datasets synced yet.</span>';
+      _datasetsLoaded = true;
+      return;
+    }
+    list.forEach(ds => {
+      const btn = document.createElement('button');
+      btn.className = 'ds-chip';
+      btn.dataset.ds = ds.dataset;
+      btn.innerHTML = `${esc(ds.dataset)}<span class="ds-count">${ds.count.toLocaleString()}</span>`;
+      btn.addEventListener('click', () => selectDataset(ds.dataset, ds.count));
+      wrap.appendChild(btn);
+    });
+    _datasetsLoaded = true;
+  } catch (e) {
+    wrap.innerHTML = `<span class="data-caption" style="color:var(--fail)">Failed to load datasets: ${esc(e.message)}</span>`;
+    toast('Failed to load datasets', true);
+  }
+}
+
+async function selectDataset(dataset, totalCount) {
+  _activeDataset = dataset;
+
+  // Update chip highlight
+  document.querySelectorAll('.ds-chip').forEach(b => b.classList.toggle('on', b.dataset.ds === dataset));
+
+  // Wire download button
+  const dlBtn = document.getElementById('csvDownloadBtn');
+  dlBtn.href = `/api/data/${encodeURIComponent(dataset)}/export.csv`;
+  dlBtn.download = `${dataset}.csv`;
+
+  // Show preview section
+  const section = document.getElementById('dataPreviewSection');
+  section.hidden = false;
+
+  const caption = document.getElementById('dataCaption');
+  caption.textContent = 'Loading…';
+  document.getElementById('dataPreviewEmpty').hidden = true;
+  document.getElementById('dataPreviewTable').hidden = true;
+
+  try {
+    const res = await apiFetch(`/api/data/${encodeURIComponent(dataset)}/preview?limit=50`);
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    if (!data.columns || !data.columns.length || !data.rows || !data.rows.length) {
+      document.getElementById('dataPreviewEmpty').hidden = false;
+      caption.textContent = `${esc(dataset)} · 0 rows`;
+      return;
+    }
+
+    // Build header
+    const head = document.getElementById('dataPreviewHead');
+    head.innerHTML = '<tr>' + data.columns.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>';
+
+    // Build body
+    const tbody = document.getElementById('dataPreviewBody');
+    tbody.innerHTML = '';
+    data.rows.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = data.columns.map(c => {
+        const v = row[c];
+        const display = v == null ? '' : String(v);
+        const isMono = c === 'natural_key' || c === 'ingested_at' || display.startsWith('{') || display.startsWith('[');
+        return `<td${isMono ? ' class="num"' : ''}>${esc(display.length > 120 ? display.slice(0, 120) + '…' : display)}</td>`;
+      }).join('');
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('dataPreviewTable').hidden = false;
+    const shown = data.rows.length;
+    caption.textContent = shown < totalCount
+      ? `showing first ${shown.toLocaleString()} of ${totalCount.toLocaleString()} rows · ${dataset}`
+      : `${shown.toLocaleString()} rows · ${dataset}`;
+  } catch (e) {
+    caption.textContent = 'Failed to load preview';
+    toast('Failed to load preview: ' + e.message, true);
+  }
+}
 
 // ══════════════════════════════════════════════════════════════════
 // boot

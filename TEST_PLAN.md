@@ -77,3 +77,23 @@ missing-detail skip, record-level error skip + sweep suppression, and auth-error
 | TC-025 | P0 | failure | `/api/*` without a session | `401 unauthorized` | ✅ live + unit |
 | TC-026 | P0 | happy | **password** login → session cookie → console served | wrong pw `401`; correct → `303` + cookie; `/` serves wired console | ✅ live + unit |
 | TC-027 | regression | — | `make_client()` default path (no `env`/`secret_values`) unchanged | TC-011/012 + crunchtime smoke still pass | ✅ (menuworks + mw_recipes green) |
+
+---
+
+## Feature: MenuWorks ingredient two-stage handler + Data browser — TBD
+
+- **Date:** 2026-06-30 · `sync_menuworks_ingredients.py`, `web/` Data page.
+
+| ID | Pri | Type | Scenario | Expected | Status |
+|---|---|---|---|---|---|
+| TC-028 | P0 | happy | Stage1 filters products to Ingredient + dedups; Stage2 one batched `filter.mrns` call | only Ingredient mrns; `data.ingredients` extracted | ✅ unit |
+| TC-029 | P1 | happy | `include` flags sent on the ingredients call | `allergens` + `nutrientTypes:[Standard]` in options | ✅ unit |
+| TC-030 | P1 | edge | `mrn_batch_size` splits mrns into multiple filter calls | N calls, each with its mrn chunk | ✅ unit |
+| TC-031 | P1 | edge | chunk returns no `data.ingredients` | skipped; `_sweep_safe=False` | ✅ unit |
+| TC-032 | P0 | failure | transient `500` on a chunk | skipped, run continues; sweep suppressed | ✅ unit |
+| TC-033 | P0 | failure | `401/403` on a chunk | `ApiError` propagates (abort) | ✅ unit |
+| TC-034 | — | live | live `/ingredients` filter call against Prod | **filter accepted (no 400)**; endpoint currently **504s** (upstream timeout) — handler skips gracefully; data pull deferred | ⚠️ API 504 |
+| TC-035 | P0 | failure | `GET /api/data/datasets` without session | `401` | ✅ unit |
+| TC-036 | P0 | failure | unknown dataset name in `/api/data/{ds}/...` | `404` (whitelist rejects) | ✅ unit |
+| TC-037 | P0 | edge | `export.csv` with DB down/empty table | no `500`; empty/headers-only CSV | ✅ unit |
+| TC-038 | P0 | happy | console serves Data panel + Download-CSV wired to `/api/data/*` | panel + CSV link present | ✅ unit + serve check |
