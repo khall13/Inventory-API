@@ -71,13 +71,22 @@ If verification shows otherwise, that becomes its own task (and triggers TC-019 
 
 ## Phases & checklist
 
-### Phase A — Branch + config (no creds needed)
-- [ ] Branch `khallwachs/feature/TBD_menuworks-compass-live-conn`
-- [ ] Edit 1 (`connectors.yaml`) — dual header + Compass base URLs + smoke path
-- [ ] Edit 2 (`.env` + `.env.example`)
-- [ ] Edit 3 (`MenuWorks_API_Reference.md`)
-- [ ] **TC-011/012** (no creds): confirm the built request carries both headers and the base+path
-      join produces no `/v3/v3`. Prove with a dry-run/print of the prepared request.
+### Phase A — config + tests (no creds needed) ✅ DONE 2026-06-30
+- [x] Edit 1 (`connectors.yaml`) — dual header + Compass base URLs + smoke path `/v3/business_units`
+- [x] Edit 2 (`.env` created local-only + `.env.example` placeholders)
+- [x] Edit 3 (`MenuWorks_API_Reference.md` reconciled to 3.0 / Compass / dual-header)
+- [x] **TC-011/012** pass (`scripts/tests/test_menuworks_connector.py`): both headers present;
+      `…/stg` + `/v3/business_units` → no `/v3/v3` duplication. Independently re-verified.
+
+### Phase A.5 — Infra ✅ DONE 2026-06-30
+- [x] GitHub repo (private): https://github.com/khall13/Inventory-API — baseline pushed to `main`
+- [x] Railway project **Inventory API** (`fc52c457…`) + **Postgres** (RUNNING)
+- [x] Service **inventory-sync** connected to the repo; vars set: `MW_ENV`, `MW_CLIENT_ID`,
+      `MW_IBM_CLIENT_ID`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`
+- [ ] ⚠️ **Scheduled command needs scoping before enabling** — see Risk #6
+
+> Note: initial work landed on `main` as the repo's first commit (no prior history to branch from).
+> Phase B/C work should use a feature branch.
 
 ### Phase B — Live auth + contract (needs creds; no DB needed)
 - [ ] **TC-013** `python sync.py --smoke --connector menuworks` → expect `200`, no `401`
@@ -109,6 +118,7 @@ If verification shows otherwise, that becomes its own task (and triggers TC-019 
 | 3 | 3.0 endpoint shapes may differ from the 3.1.3 reference | Don't trust the reference — confirm every `records_key`/natural key via `--pages 1 --dump`. |
 | 4 | Phase C blocked on Railway `DATABASE_URL` | Phases A/B fully unblock auth + contract; only landing/transform waits on the DB. |
 | 5 | Read-only contract on Production | Zero `save*`/write calls — enforced by only configuring GET domains. |
+| 6 | **Scheduled deploy runs `--domain all --mode incremental --email`** (`railway.json`/Dockerfile). With only MenuWorks ready, this fails nightly: Crunchtime domains 401 (no creds) and `--email` has no SMTP. | Honor separation: make the daily command domain-selectable (env var, e.g. `SYNC_DOMAINS=mw_*`) so the MenuWorks deploy runs only `mw_*`, and either set SMTP or drop `--email`. **Do not enable the schedule until scoped.** Shared-engine change → gate on TC-019. |
 
 ## Definition of done
 Phases A–D complete; **TC-011 → TC-019 pass** (incl. Crunchtime regression); auth proven live;

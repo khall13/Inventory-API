@@ -6,3 +6,5 @@ samples/*.json
 
 # Live credentials captured from the MenuWorks onboarding email — local only, never push
 MenuWorks/MenuWorks_Connection.md
+
+.DS_Store
