@@ -58,31 +58,38 @@ domains:
     supports_incremental: false
     mode: full
 
+  # Ingredients: 3.0 /ingredients REJECTS an unfiltered call (400 "Filter is a required
+  # parameter") — it takes options.filter.mrns=[...]. So it is NOT a bulk pager: a two-stage
+  # list→filter handler pages products (productType=Ingredient) then fetches detail in batched
+  # filter calls. (Confirmed from a live sample 2026-06-30; see MenuWorks_API_Reference.md.)
   - name: mw_ingredients
     connector: menuworks
-    path: /v3/business_units/-1/ingredients
-    records_key: data.ingredients
-    page_size: 100
+    handler: sync_menuworks_ingredients     # overrides the generic pager
+    path: /v3/business_units/-1/ingredients # advisory (built by the handler)
+    records_key: data.ingredients           # advisory; handler extracts it
+    page_size: 100                          # Stage-1 products page size
     natural_key_path: mrn
     label_path: name
     raw_table: raw.mw_ingredients
     supports_incremental: false
     mode: full
-    extra_params:                           # detail opt-ins (default false at the API)
-      include:
-        allergens: true
-        nutrientTypes: [Standard]
+    # unit_id: -1            # default; set a specific business unit to scope the pull
+    # mrn_batch_size: 100    # mrns per Stage-2 filter call
+    # detail_include: {...}  # override DEFAULT_INCLUDE in sync_menuworks_ingredients.py
 
-  - name: mw_menu_items
-    connector: menuworks
-    path: /v3/business_units/-1/menu_items
-    records_key: data.menuItems
-    page_size: 100
-    natural_key_path: id                    # also carries mrn
-    label_path: name
-    raw_table: raw.mw_menu_items
-    supports_incremental: false
-    mode: full
+  # Menu items: 3.0 /menu_items also requires a filter (400 "Filter is a required parameter"),
+  # but its filter shape is UNCONFIRMED (likely date/location-based, not mrns — menu_items are
+  # menu-plan rows, not catalog products). DISABLED until a live sample confirms the filter, so
+  # `--domain all` does not 400. Re-enable with a dedicated handler once the filter is known.
+  # - name: mw_menu_items
+  #   connector: menuworks
+  #   handler: sync_menuworks_menu_items    # TODO: build once filter shape confirmed
+  #   records_key: data.menuItems
+  #   natural_key_path: id
+  #   label_path: name
+  #   raw_table: raw.mw_menu_items
+  #   supports_incremental: false
+  #   mode: full
 
   # Recipes: NO bulk detail endpoint → two-stage list→detail handler (ADR 0002).
   - name: mw_recipes
