@@ -141,3 +141,16 @@ Sample product record:
 { "mrn": "10001", "productType": "Recipe", "name": "On the Go: Caprese Parfait",
   "url": "/BusinessUnit/-1/recipes/10001", "updatedDate": "2023-07-17T13:08:44", "cost": 22.85 }
 ```
+
+### Live landing results + the `/ingredients` 504 (2026-06-30)
+First real sync into `raw.*`: **products 500**, **units_of_measure 88**, **recipes 96** (handler
+fetched 96/100; 4 recipes returned no `data.recipe`, skipped → sweep suppressed). All clean.
+
+**`/ingredients` is currently broken upstream — NOT our code.** A diagnostic tried the filter call
+three ways — 1 mrn no-include, 1 mrn allergens-only, 2 mrns no-include — and **all returned `504
+Endpoint request timed out`** (after 5 retries each). The `filter.mrns` shape is *accepted* (no more
+`400`); the endpoint itself times out at the IBM gateway for even a single minimal record. Since the
+**recipes** detail endpoint (`/recipes/{mrn}`) works fine, this is specific to `/ingredients`, not
+detail endpoints generally. The ingredient handler fails safe (retry → skip → suppress delete-sweep).
+**Action:** flag to `_DL_US_WebtritionSupport@compass-usa.com` (include an `X-B3-TraceId`); retry
+later in case it's transient load. Lightening `include` flags does NOT help (1 mrn no-include 504s).
