@@ -111,3 +111,33 @@ To sync incrementally, add these as their own `endpoints.yaml` rows with the dat
 - Execution plan for bringing the connection live: [`MenuWorks_Live_Connection_Plan.md`](MenuWorks_Live_Connection_Plan.md).
 - Architecture rationale: [ADR 0001](../docs/adr/0001-connector-based-elt.md). Onboarding more
   endpoints: see [`../docs/ADD_AN_API.md`](../docs/ADD_AN_API.md).
+
+## ✅ Confirmed from a live 3.0 sample (2026-06-30, Compass Production)
+
+A small read-only pull (`samples/mw_*.json`, gitignored) validated the real contract. **Corrections
+to the catalog above:**
+
+| Endpoint | Live result | Action for `endpoints.yaml` |
+|---|---|---|
+| `/v3/units_of_measure` | ✅ 88 recs, `data.unitsOfMeasure`, keys `id, name, shortName` | config correct |
+| `/v3/business_units` | ✅ 1 visible, `data.businessUnits` (`id, name, sectorName`) | config correct |
+| `/v3/business_units/-1/products` | ✅ **`-1` works**, `data.products`, `mrn` key, **31,118 total** | keep `-1`; use as master index |
+| `/v3/business_units/4990/products` | ⚠️ 504 timeout | prefer `-1`, not BU-scoped |
+| `/v3/business_units/{u}/ingredients` | ⚠️ **400 "Filter is a required parameter"** | NOT a bulk pager — needs `options.filter.mrns`; fetch in batches |
+| `/v3/business_units/{u}/menu_items` | ⚠️ **400 "Filter is a required parameter"** | same — requires a `filter` |
+
+**The master-index model (the real 3.0 sync shape):**
+- `products` (`-1`, paged) is the catalog of every `mrn` with a **`productType`** (`Recipe` | `Ingredient`)
+  and a `url` to its detail endpoint, e.g.
+  `…/recipes/10001` and `…/ingredients?options={"filter":{"mrns":["100079"]}}`.
+- **Recipes** → detail via `/recipes/{mrn}` (existing two-stage handler, [ADR 0002](../docs/adr/0002-menuworks-recipe-two-stage.md)).
+- **Ingredients** → detail via `/ingredients` with `options.filter.mrns=[…]` in batches — needs a
+  filter-driven handler (mirror the recipe two-stage pattern), driven by the `Ingredient`-type mrns
+  from `products`. The current `mw_ingredients` plain-pager row will 400 against 3.0.
+- **menu_items** likewise requires a `filter`.
+
+Sample product record:
+```json
+{ "mrn": "10001", "productType": "Recipe", "name": "On the Go: Caprese Parfait",
+  "url": "/BusinessUnit/-1/recipes/10001", "updatedDate": "2023-07-17T13:08:44", "cost": 22.85 }
+```
