@@ -47,7 +47,11 @@ def _raw_payloads(conn, table: str) -> list[dict]:
             return []
 
 
-def run(conn, out_path: str | Path = DEFAULT_OUT) -> int:
+def build(conn) -> dict:
+    """Pure transform: read raw.* tables via *conn*, return ``{"items": {...}, "report": {...}}``.
+
+    Sets in *report* are already converted to sorted lists so the result is JSON-serialisable.
+    """
     m = yaml.safe_load(MAPPING_FILE.read_text())
     unit_map = {k.upper(): v for k, v in m.get("unit_map", {}).items()}
     defaults = m.get("defaults", {})
@@ -118,9 +122,20 @@ def run(conn, out_path: str | Path = DEFAULT_OUT) -> int:
     report["unmapped_units"] = sorted(report["unmapped_units"])
     report["unresolved_mrn"] = sorted(report["unresolved_mrn"])
 
+    if not recipes:
+        log.warning("no raw.mw_recipes rows — run `sync.py --domain mw_recipes` first")
+
+    return {"items": result, "report": report}
+
+
+def run(conn, out_path: str | Path = DEFAULT_OUT) -> int:
+    """Build the transform and write the result to *out_path*. Returns total item count."""
+    payload = build(conn)
+    report = payload["report"]
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({"items": result, "report": report}, indent=2))
+    out_path.write_text(json.dumps(payload, indent=2))
 
     log.info("MenuWorks → PreciTaste: %s", report["counts"])
     if report["unmapped_units"]:
@@ -128,8 +143,6 @@ def run(conn, out_path: str | Path = DEFAULT_OUT) -> int:
     if report["zero_qty"]:
         log.warning("%d ingredient(s) had qty=0 → yield defaulted to 1.0: %s",
                     len(report["zero_qty"]), ", ".join(report["zero_qty"][:10]))
-    if not recipes:
-        log.warning("no raw.mw_recipes rows — run `sync.py --domain mw_recipes` first")
     log.info("wrote %s", out_path)
     return sum(report["counts"].values())
 

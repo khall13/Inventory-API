@@ -145,6 +145,50 @@
   .callout svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 1px; }
   .callout b { font-weight: 650; }
 
+  /* format panel */
+  .fmt-type-stock     { background: #4472C4; color: #fff; }
+  .fmt-type-inventory { background: #ED7D31; color: #fff; }
+  .fmt-type-service   { background: #A5A5A5; color: #fff; }
+  .fmt-type-menu      { background: #70AD47; color: #fff; }
+  .fmt-section { margin-bottom: 28px; }
+  .fmt-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+  .fmt-section-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+  .fmt-count-badge { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--mono); min-width: 24px; height: 20px; padding: 0 6px; border-radius: 10px; }
+  .fmt-item-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; margin-bottom: 8px; }
+  .fmt-item-card:last-child { margin-bottom: 0; }
+  .fmt-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .fmt-type-chip { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; flex-shrink: 0; }
+  .fmt-item-name { font-weight: 600; font-size: 13.5px; letter-spacing: -0.01em; }
+  .fmt-kv { display: grid; grid-template-columns: 160px 1fr; gap: 3px 12px; font-size: 12px; margin-bottom: 10px; }
+  .fmt-kv dt { color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; padding-top: 2px; }
+  .fmt-kv dd { color: var(--ink); font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .fmt-contains-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+  .fmt-build-wrap { overflow-x: auto; }
+  .fmt-build-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 380px; }
+  .fmt-build-table thead th { font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); text-align: left; padding: 5px 10px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .fmt-build-table thead th:first-child { border-radius: var(--r) 0 0 0; }
+  .fmt-build-table thead th:last-child { border-radius: 0 var(--r) 0 0; }
+  .fmt-build-table tbody td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .fmt-build-table tbody tr:last-child td { border-bottom: none; }
+  .fmt-build-table tbody tr:hover { background: var(--surface-2); }
+  .fmt-build-table .num-col { font-family: var(--mono); color: var(--ink-3); width: 40px; text-align: center; }
+  .fmt-build-table .qty-col { font-family: var(--mono); color: var(--ink-2); width: 80px; }
+  .fmt-build-table .unit-col { font-family: var(--mono); color: var(--ink-2); }
+  .fmt-flags-section { margin-bottom: 22px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .fmt-flags-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 12px 16px; background: var(--surface-2); border: none; cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink-2); text-align: left; }
+  .fmt-flags-toggle:hover { background: #ECEEF1; }
+  .fmt-flags-toggle svg { width: 15px; height: 15px; flex-shrink: 0; transition: transform .15s; }
+  .fmt-flags-toggle.open svg { transform: rotate(90deg); }
+  .fmt-flags-body { padding: 14px 16px; display: none; border-top: 1px solid var(--line); }
+  .fmt-flags-body.open { display: block; }
+  .fmt-flag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .fmt-flag-chip { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 5px; background: var(--warn-tint); border: 1px solid #EAD6A6; color: #7A5408; }
+  .fmt-flag-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12.5px; color: var(--ink-2); }
+  .fmt-flag-row .num { font-family: var(--mono); font-weight: 700; color: var(--ink); }
+  .fmt-flag-ok { color: var(--ok); font-size: 12.5px; }
+  .fmt-search { width: 100%; max-width: 340px; margin-bottom: 18px; }
+  .fmt-hidden { display: none !important; }
+
   /* data panel */
   .ds-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
   .ds-chip { font-family: var(--mono); font-size: 12px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--ink-2); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
@@ -207,6 +251,10 @@
       <button class="nav-item" data-panel="data">
         <svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="1.8"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="currentColor" stroke-width="1.8"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" stroke="currentColor" stroke-width="1.8"/></svg>
         Data
+      </button>
+      <button class="nav-item" data-panel="format">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M17.5 14v7M14 17.5h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Format
       </button>
     </nav>
     <div class="side-foot">
@@ -377,6 +425,37 @@
       </div>
     </section>
 
+    <!-- ════ FORMAT ════ -->
+    <section class="panel" id="panel-format">
+      <div class="phead">
+        <div>
+          <div class="eyebrow">TastEOS item model</div>
+          <h2>Format</h2>
+          <p>How each MenuWorks recipe maps to the TastEOS item model (Stock → Inventory → Service → Menu).</p>
+        </div>
+        <button class="btn" id="fmtRefreshBtn">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 14.9-3.9M20 12a8 8 0 0 1-14.9 3.9M4 4v5h5M20 20v-5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Refresh
+        </button>
+      </div>
+
+      <div id="fmtFlagsSection" class="fmt-flags-section" hidden>
+        <button class="fmt-flags-toggle" id="fmtFlagsToggle" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Data flags
+        </button>
+        <div class="fmt-flags-body" id="fmtFlagsBody">
+          <div id="fmtFlagsContent"></div>
+        </div>
+      </div>
+
+      <input class="btn fmt-search" id="fmtSearch" type="search" placeholder="Search items by name…" aria-label="Filter items by display name">
+
+      <div id="fmtBody">
+        <div class="empty-state" id="fmtLoading">Loading…</div>
+      </div>
+    </section>
+
     <!-- ════ SCHEDULE ════ -->
     <section class="panel" id="panel-schedule">
       <div class="phead">
@@ -438,7 +517,7 @@ function toast(msg, isError = false) {
 // ══════════════════════════════════════════════════════════════════
 // nav
 // ══════════════════════════════════════════════════════════════════
-const titles = { connections: 'Connections', email: 'Email (SMTP)', schedule: 'Schedule', data: 'Data' };
+const titles = { connections: 'Connections', email: 'Email (SMTP)', schedule: 'Schedule', data: 'Data', format: 'Format' };
 document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nav-item').forEach(b => { b.classList.remove('on'); b.removeAttribute('aria-current'); });
@@ -449,6 +528,7 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     document.getElementById('topTitle').textContent = titles[p];
     if (p === 'email') loadSmtp();
     if (p === 'data') loadDatasets();
+    if (p === 'format') loadFormat();
   });
 });
 
@@ -1009,6 +1089,204 @@ async function selectDataset(dataset, totalCount) {
     toast('Failed to load preview: ' + e.message, true);
   }
 }
+
+// ══════════════════════════════════════════════════════════════════
+// FORMAT PANEL
+// ══════════════════════════════════════════════════════════════════
+const TYPE_COLORS = { stock: '#4472C4', inventory: '#ED7D31', service: '#A5A5A5', menu: '#70AD47' };
+const TYPE_ORDER  = ['stock', 'inventory', 'service', 'menu'];
+let _fmtData = null;
+let _fmtLoaded = false;
+
+function fmtQty(yields) {
+  if (!yields || yields === 0) return '—';
+  return String(Math.round((1 / yields) * 10000) / 10000);
+}
+
+function fmtKv(pairs) {
+  // pairs = [[label, value], ...]
+  const dts = pairs.map(([k]) => `<dt>${esc(k)}</dt>`).join('');
+  const dds = pairs.map(([, v]) => `<dd>${esc(v == null ? '—' : String(v))}</dd>`).join('');
+  // Interleave dt/dd for CSS grid display
+  return pairs.map(([k, v]) =>
+    `<dt>${esc(k)}</dt><dd>${esc(v == null ? '—' : String(v))}</dd>`
+  ).join('');
+}
+
+function fmtContainsTable(contains) {
+  if (!contains || !contains.length) return '';
+  const rows = contains.map(c => `
+    <tr>
+      <td class="num-col">${esc(String(c.order ?? ''))}</td>
+      <td>${esc(c.ingredient || '—')}</td>
+      <td class="qty-col">${esc(fmtQty(c.yields))}</td>
+      <td class="unit-col">${esc(c.unit || '—')}</td>
+    </tr>`).join('');
+  return `
+    <div class="fmt-contains-label">Build tree</div>
+    <div class="fmt-build-wrap">
+      <table class="fmt-build-table">
+        <thead><tr><th>#</th><th>Ingredient</th><th>Qty</th><th>Unit</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function fmtItemFields(type, item) {
+  const pairs = [];
+  if (type === 'stock') {
+    pairs.push(['Unit', item.unit], ['Shelf life', item.shelf_life]);
+  } else if (type === 'inventory') {
+    pairs.push(
+      ['Production unit', item.unit],
+      ['On-hand unit', item.on_hand_unit],
+      ['Conversion factor', item.unit_conversion_factor],
+      ['Shelf life', item.shelf_life],
+      ['Increment step', item.increment_step],
+    );
+  } else if (type === 'service') {
+    pairs.push(
+      ['Production unit', item.unit],
+      ['On-hand unit', item.on_hand_unit],
+      ['Conversion factor', item.unit_conversion_factor],
+      ['Shelf life', item.shelf_life],
+      ['Production time', item.production_time != null ? JSON.stringify(item.production_time) : null],
+    );
+  } else if (type === 'menu') {
+    pairs.push(['Unit', item.unit]);
+  }
+  return pairs.length
+    ? `<dl class="fmt-kv">${fmtKv(pairs)}</dl>`
+    : '';
+}
+
+function fmtBuildCard(type, item) {
+  const color = TYPE_COLORS[type] || '#888';
+  return `
+    <div class="fmt-item-card" data-name="${esc((item.display_name || '').toLowerCase())}">
+      <div class="fmt-item-header">
+        <span class="fmt-type-chip fmt-type-${esc(type)}" style="background:${color}">${esc(type)}</span>
+        <span class="fmt-item-name">${esc(item.display_name || '—')}</span>
+      </div>
+      ${fmtItemFields(type, item)}
+      ${fmtContainsTable(item.contains)}
+    </div>`;
+}
+
+function fmtRenderFlags(report) {
+  const section = document.getElementById('fmtFlagsSection');
+  const content = document.getElementById('fmtFlagsContent');
+  const unmapped = report.unmapped_units || [];
+  const zeroQty  = (report.zero_qty || []).length;
+  const unresolved = (report.unresolved_mrn || []).length;
+  const hasFlags = unmapped.length || zeroQty || unresolved;
+
+  section.hidden = false;
+  if (!hasFlags) {
+    content.innerHTML = `<span class="fmt-flag-ok">✓ No data-quality flags — all units mapped, no zero-qty or unresolved MRNs.</span>`;
+    return;
+  }
+
+  let html = '';
+  if (unmapped.length) {
+    const chips = unmapped.map(u => `<span class="fmt-flag-chip">${esc(u)}</span>`).join('');
+    html += `<div class="fmt-flag-row"><span class="num">${unmapped.length}</span> unmapped unit${unmapped.length !== 1 ? 's' : ''} (add to mw_precitaste_mapping.yaml):</div>
+             <div class="fmt-flag-chips">${chips}</div>`;
+  }
+  if (zeroQty) {
+    html += `<div class="fmt-flag-row" style="margin-top:10px"><span class="num">${zeroQty}</span> ingredient${zeroQty !== 1 ? 's' : ''} with qty = 0 (yield defaulted to 1.0)</div>`;
+  }
+  if (unresolved) {
+    html += `<div class="fmt-flag-row"><span class="num">${unresolved}</span> unresolved MRN${unresolved !== 1 ? 's' : ''} (ingredient referenced but name missing)</div>`;
+  }
+  content.innerHTML = html;
+}
+
+function fmtRender(data) {
+  _fmtData = data;
+  const items = data.items || {};
+  const report = data.report || {};
+
+  // Data flags
+  fmtRenderFlags(report);
+
+  // Flags toggle
+  const toggle = document.getElementById('fmtFlagsToggle');
+  const body   = document.getElementById('fmtFlagsBody');
+  toggle.addEventListener('click', () => {
+    const open = body.classList.toggle('open');
+    toggle.classList.toggle('open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+
+  const container = document.getElementById('fmtBody');
+  let html = '';
+
+  for (const type of TYPE_ORDER) {
+    const list = items[type] || [];
+    const color = TYPE_COLORS[type] || '#888';
+    html += `
+      <div class="fmt-section" data-section="${esc(type)}">
+        <div class="fmt-section-header">
+          <span class="fmt-count-badge" style="background:${color};color:#fff">${list.length}</span>
+          <span class="fmt-section-title" style="color:${color}">${esc(type.charAt(0).toUpperCase() + type.slice(1))}</span>
+        </div>
+        <div class="fmt-items" data-type="${esc(type)}">
+          ${list.length === 0
+            ? `<div class="empty-state" style="padding:16px 0;text-align:left;font-size:12px">No ${esc(type)} items.</div>`
+            : list.map(item => fmtBuildCard(type, item)).join('')
+          }
+        </div>
+      </div>`;
+  }
+
+  if (data.error) {
+    html = `<div class="callout" style="margin-bottom:18px">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 9v4m0 4h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><b>Transform error:</b> ${esc(data.error)}</div>
+    </div>` + html;
+  }
+
+  container.innerHTML = html || '<div class="empty-state">No items returned.</div>';
+}
+
+async function loadFormat(force = false) {
+  if (_fmtLoaded && !force) return;
+  const container = document.getElementById('fmtBody');
+  container.innerHTML = '<div class="empty-state" id="fmtLoading">Loading…</div>';
+  document.getElementById('fmtFlagsSection').hidden = true;
+  document.getElementById('fmtSearch').value = '';
+  try {
+    const res = await apiFetch('/api/format/preview');
+    const data = await res.json();
+    fmtRender(data);
+    _fmtLoaded = true;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state" style="color:var(--fail)">Failed to load format preview: ${esc(e.message)}</div>`;
+    toast('Failed to load format preview: ' + e.message, true);
+  }
+}
+
+// Refresh button
+document.getElementById('fmtRefreshBtn').addEventListener('click', () => {
+  _fmtLoaded = false;
+  loadFormat(true);
+});
+
+// Search / filter
+document.getElementById('fmtSearch').addEventListener('input', function () {
+  const q = this.value.trim().toLowerCase();
+  document.querySelectorAll('#fmtBody .fmt-item-card').forEach(card => {
+    const name = card.dataset.name || '';
+    card.classList.toggle('fmt-hidden', q.length > 0 && !name.includes(q));
+  });
+  // Hide section headers when all items in that section are hidden
+  document.querySelectorAll('#fmtBody .fmt-section').forEach(sec => {
+    const cards = sec.querySelectorAll('.fmt-item-card');
+    const anyVisible = Array.from(cards).some(c => !c.classList.contains('fmt-hidden'));
+    sec.classList.toggle('fmt-hidden', cards.length > 0 && !anyVisible);
+  });
+});
 
 // ══════════════════════════════════════════════════════════════════
 // boot

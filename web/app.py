@@ -776,6 +776,42 @@ async def preview_dataset(dataset: str, request: Request, limit: int = 50):
     return JSONResponse({"columns": columns, "rows": out_rows})
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Format API  — preview MenuWorks data in TastEOS item format
+# ─────────────────────────────────────────────────────────────────────────────
+
+_EMPTY_FORMAT_PAYLOAD: dict = {
+    "items": {"stock": [], "inventory": [], "service": [], "menu": []},
+    "report": {"counts": {}, "unmapped_units": [], "zero_qty": [], "unresolved_mrn": []},
+}
+
+
+@app.get("/api/format/preview")
+async def format_preview(request: Request):
+    """Return landed MenuWorks data in TastEOS item format (stock/inventory/service/menu)."""
+    guard = _require_api_auth(request)
+    if guard:
+        return guard
+
+    db_conn = None
+    try:
+        import transform_mw_precitaste as _transform  # lazy import — pulls yaml/db
+        db_conn = _db.connect()
+        payload = _transform.build(db_conn)
+        return JSONResponse(payload)
+    except Exception as exc:
+        log.warning("format_preview failed: %s", exc)
+        result = dict(_EMPTY_FORMAT_PAYLOAD)
+        result["error"] = str(exc)
+        return JSONResponse(result)
+    finally:
+        if db_conn is not None:
+            try:
+                db_conn.close()
+            except Exception:
+                pass
+
+
 @app.get("/api/data/{dataset}/export.csv")
 async def export_dataset_csv(dataset: str, request: Request):
     """Stream all rows of a whitelisted dataset as a CSV download."""
