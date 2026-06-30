@@ -25,6 +25,17 @@ unit_map:
   KG: "Kilograms (kg)"
   EA: "Each"
   EACH: "Each"
+  # Lowercase / spelled-out variants seen in live recipe ingredients (2026-06-30). Keys are
+  # uppercased at load, so these match case-insensitively. Only unambiguous STANDARD units are
+  # added — custom portion units (oz parfait, oz portion, bowl, Can #10, spray, serving(s), slice)
+  # are intentionally left UNMAPPED so they surface as flags and get real TasteOS units created.
+  OUNCE: "Ounces (oz-wt)"
+  FLOZ: "Fl Oz"
+  QUART: "Quart"
+  PINT: "Pint"
+  GALLON: "Gallon"
+  POUND: "Pounds (lbs)"
+  PIECE: "Each"
 
 defaults:
   stock_unit: "Each"          # ingredients carry no clear storage unit → default + flag
