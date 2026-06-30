@@ -1,0 +1,32 @@
+# MenuWorks → PreciTaste (TastEOS) mapping. Rule-based + tunable.
+# Drives transform_mw_precitaste.py. Best-effort until a live recipe sample lands — the
+# transform prints a coverage report (unmapped units, unresolved mrns, zero-qty) to refine this.
+
+classification:
+  # A MenuWorks recipe becomes a MENU item if its mrn appears in mw_menu_items (sold on a menu).
+  # Otherwise it's INVENTORY (prep). MenuWorks has no clear station/Service signal → no service tier.
+  menu_when: mrn_in_menu_items
+
+# MenuWorks UnitOfMeasure name (data.unitsOfMeasure[].name, resolved via unitId) → TastEOS unit.
+# Unknowns pass through and are FLAGGED (create via the unit-management skill before upload).
+unit_map:
+  L: "Liter"
+  ML: "Milliliter"
+  GAL: "Gallon"
+  QT: "Quart"
+  PT: "Pint"
+  CUP: "Cup"
+  "FL OZ": "Fl Oz"
+  TBSP: "Tablespoon"
+  TSP: "Teaspoon"
+  OZ: "Ounces (oz-wt)"
+  LB: "Pounds (lbs)"
+  G: "Grams (g)"
+  KG: "Kilograms (kg)"
+  EA: "Each"
+  EACH: "Each"
+
+defaults:
+  stock_unit: "Each"          # ingredients carry no clear storage unit → default + flag
+  inventory_production_unit: "Recipe"
+  menu_unit: "Each"           # menu items must resolve to dish/each

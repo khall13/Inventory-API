@@ -1,0 +1,6 @@
+scripts/.env
+scripts/.venv/
+**/__pycache__/
+*.pyc
+samples/*.json
+output/*.json

@@ -1,0 +1,42 @@
+# Crunchtime → PreciTaste (TastEOS) mapping. Rule-based + tunable.
+# Drives transform_precitaste.py. Defaults are best-effort; refine after a real sample
+# (the transform prints a decision/coverage report so you know what to adjust).
+
+classification:
+  # A recipe becomes a MENU item if ANY of these predicates is true (sold at POS).
+  menu_when_any: [has_plu_number, has_pos_decrement]
+  # Among non-menu recipes: assigned to a prep station ⇒ SERVICE (station assembly),
+  # otherwise ⇒ INVENTORY (made-ahead prep).
+  service_when_any: [has_prep_station]
+  # Leaf components (a component whose number is NOT itself a recipe) ⇒ STOCK.
+
+# CT package type → TastEOS unit display name. Unknowns are passed through and FLAGGED
+# in the report (create them via the unit-management skill before upload).
+unit_map:
+  LB: "Pounds (lbs)"
+  OZ: "Ounces (oz-wt)"
+  G:  "Grams (g)"
+  KG: "Kilograms (kg)"
+  EA: "Each"
+  CS: "Case"
+  QT: "Quart"
+  GAL: "Gallon"
+  PT: "Pint"
+  CUP: "Cup"
+  FLOZ: "Fl Oz"
+  TBSP: "Tablespoon"
+  TSP: "Teaspoon"
+  ML: "Milliliter"
+  L: "Liter"
+  DISH: "Dish"
+  EACH: "Each"
+
+# CT shelf_life_type / prep_time_type → seconds multiplier.
+duration_type_seconds:
+  D: 86400
+  H: 3600
+  M: 60
+
+defaults:
+  menu_unit: "Each"            # menu items must resolve to dish/each (item-hierarchy rule)
+  service_production_seconds: 300   # fallback when a recipe has no prep_time (F10 requires it)

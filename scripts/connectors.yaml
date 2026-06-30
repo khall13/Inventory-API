@@ -1,0 +1,72 @@
+# Connector registry — one block per integrated API. Adding a tool = add a block here
+# + its endpoints to endpoints.yaml. No client code change unless the auth scheme is new.
+# See docs/ADD_AN_API.md for the full runbook.
+#
+# Per-connector keys:
+#   base_urls        named environments → base URL
+#   env_select       env var whose value (test|prod|…) picks the base URL  (default: test)
+#   auth.type        headers | bearer | basic | query_key
+#   auth.headers     header_name → ENV_VAR        (type: headers)
+#   auth.token_env   ENV_VAR holding the bearer token (type: bearer)
+#   auth.user_env / auth.pass_env                 (type: basic)
+#   auth.params      query_param → ENV_VAR        (type: query_key)
+#   error_parser     spring | generic
+#   trace_header     response header to log for support tickets (optional)
+#   smoke_path       a cheap GET used by `sync.py --smoke` to prove auth
+#   paging           page_param / size_param / has_next_field / total_pages_field overrides
+
+connectors:
+  crunchtime:
+    base_urls:
+      test: https://webservices-test.net-chef.com
+      prod: https://webservices.net-chef.com
+    env_select: CT_ENV
+    auth:
+      type: headers
+      headers:
+        authenticationtoken: CT_AUTH_TOKEN
+        sitename: CT_SITENAME
+        userid: CT_USER_ID
+        password: CT_PASSWORD
+    error_parser: spring
+    trace_header: X-B3-TraceId
+    smoke_path: /applicationuser/v1/getAllApplicationUsers
+    paging:
+      page_param: pageNumber
+      size_param: pageSize
+      has_next_field: hasNext
+      total_pages_field: totalPages
+
+  # ── MenuWorks (Webtrition) Web Services 3.1 ──────────────────────────────────
+  # Dual client-id headers (IBM gateway + Webtrition); pagination nested in a JSON `options` query param
+  # (no hasNext bool — end is detected via paginationDetails count / short page).
+  menuworks:
+    base_urls:
+      prod: https://api.compass-usa.com/stg      # IBM gateway; base has NO trailing /v3 (paths add it)
+      qa:   https://apiqas.compass-usa.com/stg/qas
+    env_select: MW_ENV
+    auth:
+      type: headers
+      headers:
+        X-IBM-Client-Id: MW_IBM_CLIENT_ID        # IBM gateway id — per-environment value
+        WT-Client-Id:    MW_CLIENT_ID            # Webtrition id — same across envs
+    error_parser: generic
+    smoke_path: /v3/business_units               # proven in the onboarding example call
+    paging:
+      style: options_json        # options={"page":{"offset":N,"limit":M}}
+      offset_start: 1
+
+  # ── Template for the next tool (e.g. a bearer-token REST API) ────────────────
+  # example_tool:
+  #   base_urls:
+  #     prod: https://api.example.com
+  #   env_select: EXAMPLE_ENV
+  #   auth:
+  #     type: bearer
+  #     token_env: EXAMPLE_API_TOKEN
+  #   error_parser: generic
+  #   smoke_path: /v1/ping
+  #   paging:
+  #     page_param: page
+  #     size_param: per_page
+  #     has_next_field: has_more

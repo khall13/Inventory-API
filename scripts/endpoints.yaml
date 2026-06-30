@@ -1,0 +1,130 @@
+# Config-driven extractor (plan §3). Add a domain = add a row here; no code change.
+#
+# Per-domain keys:
+#   name                 logical domain name (also --domain value and sync_state key)
+#   path                 REST path appended to the env base URL
+#   records_key          response field holding the array of records
+#   page_param           pagination page-number param          (default: pageNumber)
+#   size_param           pagination page-size param             (default: pageSize)
+#   page_size            records per page
+#   natural_key_path     dotted path into each record → the upsert PK (raw.*)
+#   raw_table            target landing table (schema-qualified)
+#   supports_incremental whether the endpoint honors minutesSinceUpdate
+#   mode                 default sync mode: full | incremental   (plan §4)
+#   extra_params         static query params always sent (e.g. includeDetails)
+#   transform            optional module name in scripts/ exposing run(conn) (e.g. transform_recipes)
+
+defaults:
+  connector: crunchtime           # connectors.yaml block providing base URL + auth + paging
+  page_size: 200
+
+domains:
+  # ── PRIMARY DOMAIN ──────────────────────────────────────────────────────────
+  - name: recipes
+    connector: crunchtime
+    path: /recipe/v2/getRecipesEnhancedByPage     # getRecipesEnhancedByPageV2 (verified 2026-06-25)
+    records_key: recipeEnhancedDetails
+    page_size: 100
+    natural_key_path: recipeEnhancedHeaderDetails.number
+    label_path: recipeEnhancedHeaderDetails.name  # human name for the daily change email
+    raw_table: raw.recipes
+    supports_incremental: true
+    mode: full                                    # master data → daily full snapshot (plan §4A)
+    transform: transform_recipes
+    extra_params:
+      includeDetails: true                        # REQUIRED — components empty without these (plan §5)
+      componentDetails: true
+
+  # ══ MenuWorks connector (verified from the 3.1 API spec) ════════════════════
+  - name: mw_units_of_measure
+    connector: menuworks
+    path: /v3/units_of_measure
+    records_key: data.unitsOfMeasure        # nested envelope (dotted key)
+    natural_key_path: id
+    label_path: name
+    raw_table: raw.mw_units_of_measure
+    paged: false                            # small reference list, takes no options
+    supports_incremental: false
+    mode: full
+
+  - name: mw_products
+    connector: menuworks
+    path: /v3/business_units/-1/products    # -1 = all business units (mass sync, spec-confirmed)
+    records_key: data.products
+    page_size: 100
+    natural_key_path: mrn                   # master reference number
+    label_path: name
+    raw_table: raw.mw_products
+    supports_incremental: false
+    mode: full
+
+  - name: mw_ingredients
+    connector: menuworks
+    path: /v3/business_units/-1/ingredients
+    records_key: data.ingredients
+    page_size: 100
+    natural_key_path: mrn
+    label_path: name
+    raw_table: raw.mw_ingredients
+    supports_incremental: false
+    mode: full
+    extra_params:                           # detail opt-ins (default false at the API)
+      include:
+        allergens: true
+        nutrientTypes: [Standard]
+
+  - name: mw_menu_items
+    connector: menuworks
+    path: /v3/business_units/-1/menu_items
+    records_key: data.menuItems
+    page_size: 100
+    natural_key_path: id                    # also carries mrn
+    label_path: name
+    raw_table: raw.mw_menu_items
+    supports_incremental: false
+    mode: full
+
+  # Recipes: NO bulk detail endpoint → two-stage list→detail handler (ADR 0002).
+  - name: mw_recipes
+    connector: menuworks
+    handler: sync_menuworks_recipes         # overrides the generic pager
+    path: /v3/business_units/-1/recipes/{mrn}   # advisory (templated by the handler)
+    records_key: data.recipe                # advisory; handler extracts it
+    page_size: 100                          # Stage-1 products page size
+    natural_key_path: mrn
+    label_path: name
+    raw_table: raw.mw_recipes
+    supports_incremental: false             # incremental later via recipe_deltas
+    mode: full
+    # unit_id: -1            # default; set a specific business unit to scope the pull
+    # detail_include: {...}  # override DEFAULT_INCLUDE in sync_menuworks_recipes.py
+
+  # Incremental for MenuWorks = the dedicated *_deltas endpoints (e.g. menu_item_deltas)
+  # with filter.startDate + days in extra_params — NOT minutesSinceUpdate.
+
+  # ── ADDITIONAL CRUNCHTIME TIER-1 DOMAINS (templates — confirm against llms.txt + a sample) ──
+  # - name: locations
+  #   path: /location/v1/getLocationsByPage
+  #   records_key: locations
+  #   natural_key_path: locationNumber
+  #   raw_table: raw.locations
+  #   supports_incremental: false
+  #   mode: full
+  #
+  # - name: products
+  #   path: /companyproduct/v1/getCompanyProductsEnhancedByPage
+  #   records_key: companyProducts
+  #   page_size: 500
+  #   natural_key_path: productId
+  #   raw_table: raw.products
+  #   supports_incremental: true
+  #   mode: full
+  #
+  # - name: sales_mix                               # high-volume → daily incremental (plan §4B)
+  #   path: /sales/v1/getSalesMixByPage
+  #   records_key: salesMix
+  #   page_size: 500
+  #   natural_key_path: ...                          # confirm composite key from sample
+  #   raw_table: raw.sales_mix
+  #   supports_incremental: true
+  #   mode: incremental

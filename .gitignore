@@ -1,0 +1,8 @@
+scripts/.env
+scripts/.venv/
+__pycache__/
+*.pyc
+samples/*.json
+
+# Live credentials captured from the MenuWorks onboarding email — local only, never push
+MenuWorks/MenuWorks_Connection.md
