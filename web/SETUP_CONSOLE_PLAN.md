@@ -5,14 +5,14 @@ the SMTP "what changed" email — replacing hand-editing `.env` + `connectors.ya
 **Ticket:** TBD
 **Status:** 🟢 Phases 1–2 + **5 deployed live** 2026-06-30. Login, connections CRUD, encrypted
 secrets, live `test` endpoint (Compass Prod 200), and the web service are all proven in production.
-Decisions locked: **single `ADMIN_TOKEN` + login page**; **layering** (DB connections win, `.env`
+Decisions locked: **single `ADMIN_PASSWORD` + login page**; **layering** (DB connections win, `.env`
 fallback). Remaining: SMTP test (TC-024), FE→API wiring (Phase 4).
 
 ### Deployment (live)
-- **URL:** https://inventory-web-production-c606.up.railway.app  (`/login` → token from `.env` `ADMIN_TOKEN`)
+- **URL:** https://inventory-web-production-c606.up.railway.app  (`/login` → password; set/rotate via Railway `inventory-web` var `ADMIN_PASSWORD`)
 - **Project:** `Inventory API` — services: `Postgres` · `inventory-sync` (ELT, idle until scoped) · `inventory-web` (this console)
 - **One image, two roles:** `entrypoint.sh` switches on `SERVICE_ROLE` (`web`=uvicorn, `sync`=ELT). `railway.json` is build-only; cron deferred until the sync command is per-connector scoped via `SYNC_DOMAINS`.
-- **Web service vars:** `SERVICE_ROLE=web`, `APP_SECRET_KEY`, `SESSION_SECRET`, `ADMIN_TOKEN`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+- **Web service vars:** `SERVICE_ROLE=web`, `APP_SECRET_KEY`, `SESSION_SECRET`, `ADMIN_PASSWORD`, `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
 **Date:** 2026-06-30
 **Stack:** Python (FastAPI) backend + static HTML/JS frontend, PostgreSQL, Railway
 **Sample:** [`setup-console.sample.html`](setup-console.sample.html) (rendered as an Artifact)
@@ -62,7 +62,7 @@ Railway: existing "inventory-sync" cron service + NEW "inventory-web" service, s
 ### Secrets at rest
 - Encrypt `secrets`/`password` with **Fernet** (`cryptography`); key from `APP_SECRET_KEY` env on
   Railway (never in the repo). API returns secrets **masked** (`••••1a40`) — never the plaintext.
-- Web service behind auth (start: a single `ADMIN_TOKEN`/basic auth; HTTPS via Railway domain).
+- Web service behind auth (start: a single `ADMIN_PASSWORD`/basic auth; HTTPS via Railway domain).
 
 ### API (FastAPI)
 | Method | Path | Purpose |
@@ -85,14 +85,14 @@ test), **Schedule** (read-only view of the cron + which connections are enabled)
 
 ## Phases
 - **Phase 1 — Backend skeleton:** `config` schema + migrations; FastAPI app; Fernet helper;
-  connections CRUD with masking; `ADMIN_TOKEN` auth.
+  connections CRUD with masking; `ADMIN_PASSWORD` auth.
 - **Phase 2 — Test actions:** `/connections/{id}/test` reusing `make_client()` + smoke GET;
   `/smtp/test` via `notify.py`'s sender.
 - **Phase 3 — Engine integration:** sync reads enabled `config.connections` (env fallback kept);
   one customer per connector becomes many.
 - **Phase 4 — Frontend wiring:** ship `web/` static assets against the API; the sample becomes live.
 - **Phase 5 — Deploy:** new Railway `inventory-web` service (same repo, web start command), public
-  domain, `APP_SECRET_KEY` + `ADMIN_TOKEN` set; shared Postgres.
+  domain, `APP_SECRET_KEY` + `ADMIN_PASSWORD` set; shared Postgres.
 
 ## Test cases (append to TEST_PLAN.md)
 | ID | Pri | Scenario | Expected |
@@ -102,11 +102,11 @@ test), **Schedule** (read-only view of the cron + which connections are enabled)
 | TC-022 | P0 | Test with a bad IBM id | `fail`; detail surfaced; no crash |
 | TC-023 | P1 | Update connection without resending secret | existing secret preserved (not nulled) |
 | TC-024 | P0 | `POST /smtp/test` with valid creds | test email sent; `ok` |
-| TC-025 | P1 | API without `ADMIN_TOKEN` | `401` |
+| TC-025 | P1 | API without `ADMIN_PASSWORD` | `401` |
 | TC-026 | regression | sync still runs from `.env` when no DB connection rows | unchanged behavior |
 
 ## Open questions
-1. Auth depth for v1 — single `ADMIN_TOKEN` vs real user accounts? (Recommend token for v1.)
+1. Auth depth for v1 — single `ADMIN_PASSWORD` vs real user accounts? (Recommend token for v1.)
 2. One SMTP config globally, or per-customer recipients? (Recommend global + per-connection enable.)
 3. Does engine integration (Phase 3) replace `.env` or layer over it? (Recommend layer: DB wins,
    env is fallback — zero-downtime migration.)

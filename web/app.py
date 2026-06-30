@@ -19,7 +19,7 @@ POST /api/smtp/test         Send a test email; update last_test_*
 
 Config from env
 ---------------
-ADMIN_TOKEN      — required; the shared secret for the login form
+ADMIN_PASSWORD   — required; the sign-in password (change it in Railway → inventory-web vars)
 APP_SECRET_KEY   — Fernet key (also used as SESSION_SECRET fallback)
 SESSION_SECRET   — cookie signing key (falls back to APP_SECRET_KEY)
 DATABASE_URL     — psycopg2 DSN (used by db.connect())
@@ -68,7 +68,7 @@ _templates = Environment(
 )
 
 # ── helpers ───────────────────────────────────────────────────────────────────
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 
 
 def _is_authed(request: Request) -> bool:
@@ -124,7 +124,7 @@ _CONSOLE_HTML: str | None = None
 def _console_html() -> str:
     global _CONSOLE_HTML
     if _CONSOLE_HTML is None:
-        _CONSOLE_HTML = (WEB_DIR / "setup-console.sample.html").read_text()
+        _CONSOLE_HTML = (WEB_DIR / "console.html").read_text()
     return _CONSOLE_HTML
 
 
@@ -141,12 +141,12 @@ async def login_page(request: Request):
 
 
 @app.post("/login")
-async def login_submit(request: Request, token: str = Form(...)):
-    if ADMIN_TOKEN and secrets.compare_digest(token, ADMIN_TOKEN):
+async def login_submit(request: Request, password: str = Form(...)):
+    if ADMIN_PASSWORD and secrets.compare_digest(password, ADMIN_PASSWORD):
         request.session["auth"] = True
         return RedirectResponse("/", status_code=303)
     tmpl = _templates.get_template("login.html")
-    return HTMLResponse(tmpl.render(error="Invalid token — try again."), status_code=401)
+    return HTMLResponse(tmpl.render(error="Invalid password — try again."), status_code=401)
 
 
 @app.get("/logout")

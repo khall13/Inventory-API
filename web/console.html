@@ -1,0 +1,871 @@
+<title>Inventory API — Setup Console</title>
+
+<style>
+  :root {
+    --ground: #EEF0F3;
+    --surface: #FFFFFF;
+    --surface-2: #F7F8FA;
+    --line: #E0E3E9;
+    --line-strong: #CDD2DB;
+    --ink: #1B2029;
+    --ink-2: #5A6473;
+    --ink-3: #8A93A2;
+    --copper: #B4612A;
+    --copper-dk: #97501F;
+    --copper-tint: #F6ECE3;
+    --ok: #2E7D52;     --ok-tint: #E6F1EB;
+    --warn: #A9760E;   --warn-tint: #FAF0DA;
+    --fail: #C0392B;   --fail-tint: #FAE9E7;
+    --idle: #7A8492;   --idle-tint: #EDEFF2;
+    --r: 7px;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+  /* ── shell ── */
+  .shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; max-width: 1240px; margin: 0 auto; background: var(--surface); }
+  @media (max-width: 760px) { .shell { grid-template-columns: 1fr; } .side { display: none; } }
+
+  /* ── sidebar ── */
+  .side { background: var(--surface-2); border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 7px; background: var(--copper); display: grid; place-items: center; flex-shrink: 0; }
+  .brand-mark svg { width: 17px; height: 17px; }
+  .brand-name { font-weight: 650; letter-spacing: -0.02em; font-size: 14px; }
+  .brand-sub { font-size: 10.5px; color: var(--ink-3); font-family: var(--mono); letter-spacing: 0.02em; }
+  .nav { display: flex; flex-direction: column; gap: 2px; }
+  .nav-label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-3); padding: 0 8px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: var(--ink-2); font-weight: 500; cursor: pointer; border: none; background: none; font-size: 13.5px; width: 100%; text-align: left; transition: background .12s, color .12s; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: .8; }
+  .nav-item:hover { background: #ECEEF1; color: var(--ink); }
+  .nav-item.on { background: var(--copper-tint); color: var(--copper-dk); font-weight: 600; }
+  .nav-item.on svg { opacity: 1; }
+  .side-foot { margin-top: auto; padding: 10px 8px; display: flex; flex-direction: column; gap: 8px; }
+  .health { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-2); font-family: var(--mono); }
+  .health .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── main ── */
+  .main { display: flex; flex-direction: column; min-width: 0; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 28px; border-bottom: 1px solid var(--line); }
+  .topbar h1 { font-size: 16px; font-weight: 650; letter-spacing: -0.02em; }
+  .topbar .ctx { display: flex; gap: 8px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+  .panel { padding: 24px 28px 48px; display: none; }
+  .panel.on { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .panel.on { animation: none; } }
+
+  .phead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .phead .eyebrow { font-size: 9.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--copper); }
+  .phead h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.025em; margin-top: 3px; }
+  .phead p { color: var(--ink-2); font-size: 13px; margin-top: 3px; max-width: 60ch; }
+
+  /* ── buttons ── */
+  .btn { font-family: var(--sans); font-size: 13px; font-weight: 550; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: background .12s, border-color .12s, transform .05s; }
+  .btn:hover { background: var(--surface-2); border-color: var(--ink-3); }
+  .btn:active { transform: translateY(1px); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn-primary { background: var(--copper); border-color: var(--copper); color: #fff; }
+  .btn-primary:hover { background: var(--copper-dk); border-color: var(--copper-dk); }
+  .btn-ghost { border-color: transparent; background: transparent; color: var(--ink-2); padding: 6px 9px; }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+  .btn-danger { border-color: transparent; background: transparent; color: var(--fail); padding: 6px 9px; }
+  .btn-danger:hover { background: var(--fail-tint); color: var(--fail); }
+  .btn:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── logout link ── */
+  .logout-btn { font-family: var(--sans); font-size: 12px; color: var(--ink-3); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 5px; transition: color .12s, background .12s; }
+  .logout-btn:hover { color: var(--ink-2); background: var(--surface-2); }
+
+  /* ── table ── */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 720px; }
+  thead th { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  tbody td { padding: 13px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+  .cust { font-weight: 600; }
+  .sub { font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); margin-top: 1px; }
+  .sys { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; }
+  .sys .swatch { width: 9px; height: 9px; border-radius: 2px; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 12.5px; }
+  .row-actions { display: flex; gap: 4px; justify-content: flex-end; }
+
+  /* ── status pill ── */
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px 3px 7px; border-radius: 20px; white-space: nowrap; }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .pill.ok   { background: var(--ok-tint);   color: var(--ok);   } .pill.ok   .dot { background: var(--ok); }
+  .pill.warn { background: var(--warn-tint); color: var(--warn); } .pill.warn .dot { background: var(--warn); }
+  .pill.fail { background: var(--fail-tint); color: var(--fail); } .pill.fail .dot { background: var(--fail); }
+  .pill.idle { background: var(--idle-tint); color: var(--idle); } .pill.idle .dot { background: var(--idle); }
+  .pill.testing .dot { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+  /* ── forms ── */
+  .form-card { margin-top: 20px; padding: 22px; }
+  .form-card h3 { font-size: 14.5px; font-weight: 650; letter-spacing: -0.01em; }
+  .form-card .hint { font-size: 12px; color: var(--ink-2); margin-top: 2px; margin-bottom: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 18px; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.span2 { grid-column: 1 / -1; }
+  label { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-2); text-transform: uppercase; }
+  label .opt { color: var(--ink-3); font-weight: 500; text-transform: none; letter-spacing: 0; }
+  input, select, textarea { font-family: var(--sans); font-size: 13.5px; color: var(--ink); padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); width: 100%; }
+  input.mono, textarea.mono { font-family: var(--mono); font-size: 12.5px; }
+  input::placeholder, textarea::placeholder { color: var(--ink-3); }
+  select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5L6 7.5L9 4.5' stroke='%238A93A2' stroke-width='1.4' fill='none' stroke-linecap='round'/></svg>"); background-repeat: no-repeat; background-position: right 11px center; padding-right: 30px; }
+  .cred-group { display: contents; }
+  .cred-group[hidden] { display: none; }
+  .form-actions { display: flex; gap: 9px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); align-items: center; flex-wrap: wrap; }
+  .form-actions .spacer { flex: 1; }
+  .inline-note { font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); }
+
+  /* recipients chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); cursor: text; }
+  .chips .tag { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; font-size: 12px; font-family: var(--mono); }
+  .chips .tag .rm { cursor: pointer; color: var(--ink-3); font-size: 11px; line-height: 1; }
+  .chips .tag .rm:hover { color: var(--fail); }
+  .chips input { border: none; flex: 1; min-width: 120px; padding: 3px; font-family: var(--mono); font-size: 12px; background: transparent; }
+  .chips input:focus-visible { outline: none; }
+
+  /* schedule */
+  .sched-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .sched-row:last-child { border-bottom: none; }
+  .sched-row .k { font-size: 12.5px; color: var(--ink-2); }
+  .sched-row .v { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+  .callout { display: flex; gap: 11px; padding: 13px 15px; border-radius: 7px; background: var(--warn-tint); border: 1px solid #EAD6A6; margin-top: 18px; font-size: 12.5px; color: #7A5408; }
+  .callout svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 1px; }
+  .callout b { font-weight: 650; }
+
+  /* empty / loading state */
+  .empty-state { padding: 40px 28px; text-align: center; color: var(--ink-3); font-size: 13px; }
+  .empty-state p { margin-top: 6px; }
+
+  /* toast */
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 28px rgba(0,0,0,.22); display: flex; align-items: center; gap: 9px; opacity: 0; transition: transform .25s, opacity .25s; z-index: 50; max-width: 420px; }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+  #toast.is-fail { background: #5C1A14; }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+
+  .toggle { position: relative; display: inline-block; width: 38px; height: 22px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .track { position: absolute; inset: 0; background: var(--line-strong); border-radius: 20px; transition: .15s; }
+  .track::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .15s; }
+  .toggle input:checked + .track { background: var(--ok); }
+  .toggle input:checked + .track::before { transform: translateX(16px); }
+</style>
+
+<h2 class="sr-only">Inventory API setup console: manage customer API connections and the change-summary email.</h2>
+
+<div class="shell">
+  <!-- ── sidebar ── -->
+  <aside class="side">
+    <div class="brand">
+      <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none"><path d="M9 7H6a3 3 0 0 0 0 6h3M15 7h3a3 3 0 0 1 0 6h-3M8 10h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></span>
+      <div>
+        <div class="brand-name">Inventory API</div>
+        <div class="brand-sub">setup console</div>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Sections">
+      <span class="nav-label">Configuration</span>
+      <button class="nav-item on" data-panel="connections" aria-current="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M9 7H6a3 3 0 0 0 0 6h3M15 7h3a3 3 0 0 1 0 6h-3M8 10h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Connections
+      </button>
+      <button class="nav-item" data-panel="email">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Email (SMTP)
+      </button>
+      <button class="nav-item" data-panel="schedule">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Schedule
+      </button>
+    </nav>
+    <div class="side-foot">
+      <div class="health"><span class="dot" style="background:var(--ok)"></span> Postgres · connected</div>
+      <div class="health"><span class="dot" style="background:var(--ok)"></span> Web service · live</div>
+    </div>
+  </aside>
+
+  <!-- ── main ── -->
+  <div class="main">
+    <div class="topbar">
+      <h1 id="topTitle">Connections</h1>
+      <div class="ctx">
+        <span class="chip"><span class="dot" style="background:var(--copper)"></span> Railway · production</span>
+        <span class="chip">Inventory&nbsp;API</span>
+        <button class="logout-btn" id="logoutBtn" aria-label="Sign out">Sign out</button>
+      </div>
+    </div>
+
+    <!-- ════ CONNECTIONS ════ -->
+    <section class="panel on" id="panel-connections">
+      <div class="phead">
+        <div>
+          <div class="eyebrow">Customer integrations</div>
+          <h2>Connections</h2>
+          <p>Each row is one customer's API credentials for a source system. Test runs a live auth check against that customer's environment.</p>
+        </div>
+        <button class="btn btn-primary" id="newConnBtn">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          New connection
+        </button>
+      </div>
+
+      <div class="card table-wrap" id="connTableCard">
+        <table>
+          <thead>
+            <tr><th>Customer</th><th>System</th><th>Env</th><th>Business unit</th><th>Status</th><th>Last tested</th><th></th></tr>
+          </thead>
+          <tbody id="connRows">
+            <tr id="connLoadingRow">
+              <td colspan="7" class="empty-state">Loading connections…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- add / edit form -->
+      <div class="card form-card" id="connForm" hidden>
+        <h3 id="formTitle">New connection</h3>
+        <p class="hint">Credentials are encrypted at rest and shown masked after saving.</p>
+        <input type="hidden" id="f-id">
+        <div class="grid">
+          <div class="field"><label for="f-cust">Customer name</label><input id="f-cust" placeholder="e.g. Compass" autocomplete="off"></div>
+          <div class="field">
+            <label for="f-sys">Source system</label>
+            <select id="f-sys">
+              <option value="menuworks">MenuWorks (Webtrition / Compass)</option>
+              <option value="crunchtime">Crunchtime (net-chef)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-env">Environment</label>
+            <select id="f-env"><option value="prod">Production</option><option value="qa">QA</option><option value="test">Test</option></select>
+          </div>
+
+          <!-- MenuWorks fields -->
+          <div class="cred-group" data-system="menuworks">
+            <div class="field"><label for="f-bu">Business unit <span class="opt">(MenuWorks)</span></label><input id="f-bu" class="mono" placeholder="4990 (or -1 for all)" autocomplete="off"></div>
+            <div class="field span2"><label for="f-wt">WT-Client-Id <span class="opt">(blank = keep existing)</span></label><input id="f-wt" class="mono" type="password" placeholder="••••••••••••••••" autocomplete="new-password"></div>
+            <div class="field span2"><label for="f-ibm">X-IBM-Client-Id <span class="opt">(blank = keep existing)</span></label><input id="f-ibm" class="mono" type="password" placeholder="••••-••••-••••" autocomplete="new-password"></div>
+          </div>
+
+          <!-- Crunchtime fields -->
+          <div class="cred-group" data-system="crunchtime" hidden>
+            <div class="field"><label for="f-site">Sitename</label><input id="f-site" class="mono" placeholder="eattacos-test" autocomplete="off"></div>
+            <div class="field"><label for="f-uid">User ID</label><input id="f-uid" class="mono" placeholder="api_user" autocomplete="off"></div>
+            <div class="field span2"><label for="f-tok">Authentication token <span class="opt">(blank = keep existing)</span></label><input id="f-tok" class="mono" type="password" placeholder="••••••••••••••••••••" autocomplete="new-password"></div>
+            <div class="field span2"><label for="f-pwd">Password <span class="opt">(blank = keep existing)</span></label><input id="f-pwd" class="mono" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" id="formTestBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Test connection
+          </button>
+          <span class="inline-note" id="formTestNote"></span>
+          <span class="spacer"></span>
+          <button class="btn btn-ghost" id="formCancel" type="button">Cancel</button>
+          <button class="btn btn-primary" id="formSave" type="button">Save connection</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ EMAIL ════ -->
+    <section class="panel" id="panel-email">
+      <div class="phead">
+        <div>
+          <div class="eyebrow">Daily change summary</div>
+          <h2>Email (SMTP)</h2>
+          <p>The sync emails a "what changed" summary (new / changed / removed records per domain) after each daily run. Configure the sending server and recipients here.</p>
+        </div>
+      </div>
+
+      <div class="card form-card" style="margin-top:0">
+        <div class="grid">
+          <div class="field"><label for="s-host">SMTP host</label><input id="s-host" class="mono" placeholder="smtp.office365.com" autocomplete="off"></div>
+          <div class="field"><label for="s-port">Port</label><input id="s-port" class="mono" placeholder="587" autocomplete="off"></div>
+          <div class="field">
+            <label for="s-sec">Security</label>
+            <select id="s-sec">
+              <option value="starttls">STARTTLS</option>
+              <option value="ssl">SSL / TLS</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          <div class="field"><label for="s-user">Username</label><input id="s-user" class="mono" placeholder="alerts@yourco.com" autocomplete="off"></div>
+          <div class="field span2"><label for="s-pass">Password <span class="opt">(app password — blank to keep existing)</span></label><input id="s-pass" class="mono" type="password" placeholder="••••••••••••••••" autocomplete="new-password"></div>
+          <div class="field span2"><label for="s-from">From address</label><input id="s-from" class="mono" placeholder="Inventory API &lt;alerts@yourco.com&gt;" autocomplete="off"></div>
+          <div class="field span2">
+            <label>Recipients</label>
+            <div class="chips" id="rcptChips" role="group" aria-label="Recipients list">
+              <input id="s-rcpt" placeholder="add email + Enter" type="email" aria-label="Add recipient email address">
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" id="smtpTestBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-8-8 18-2-7-8-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            Send test email
+          </button>
+          <span class="inline-note" id="smtpTestNote"></span>
+          <span class="spacer"></span>
+          <label class="health" style="gap:8px"><span class="toggle"><input type="checkbox" id="s-enabled"><span class="track"></span></span> Enabled</label>
+          <button class="btn btn-primary" id="smtpSave" type="button">Save SMTP</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ SCHEDULE ════ -->
+    <section class="panel" id="panel-schedule">
+      <div class="phead">
+        <div>
+          <div class="eyebrow">Automation</div>
+          <h2>Schedule</h2>
+          <p>Read-only view of the daily Railway cron. The job pulls every enabled connection, lands changes in Postgres, and emails the summary.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="sched-row"><span class="k">Cron schedule</span><span class="v">0 8 * * * &nbsp;·&nbsp; 03:00 CT</span></div>
+        <div class="sched-row"><span class="k">Run policy</span><span class="v">run once, then exit</span></div>
+        <div class="sched-row"><span class="k">Enabled connections</span><span class="v" id="schedConnCount">—</span></div>
+        <div class="sched-row"><span class="k">Email summary</span><span class="v" id="schedEmailStatus">—</span></div>
+      </div>
+      <div class="callout">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 9v4m0 4h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><b>Per-connector scoping pending.</b> The deploy currently runs <span style="font-family:var(--mono)">--domain all</span>. Until each connection drives its own domain scope, the nightly job is held so it can't fail on connectors that aren't configured yet.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite">
+  <svg viewBox="0 0 24 24" fill="none" id="toastIcon"><path d="M5 12l5 5L19 7" stroke="#6FCF97" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// fetch wrapper — on 401 redirect to /login
+// ══════════════════════════════════════════════════════════════════
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, { credentials: 'same-origin', ...opts });
+  if (res.status === 401) {
+    window.location = '/login';
+    throw new Error('Redirecting to login');
+  }
+  return res;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// toast
+// ══════════════════════════════════════════════════════════════════
+let toastT;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  const icon = document.getElementById('toastIcon');
+  document.getElementById('toastMsg').textContent = msg;
+  el.classList.toggle('is-fail', isError);
+  icon.innerHTML = isError
+    ? '<path d="M6 18L18 6M6 6l12 12" stroke="#F87171" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+    : '<path d="M5 12l5 5L19 7" stroke="#6FCF97" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+  el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// nav
+// ══════════════════════════════════════════════════════════════════
+const titles = { connections: 'Connections', email: 'Email (SMTP)', schedule: 'Schedule' };
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(b => { b.classList.remove('on'); b.removeAttribute('aria-current'); });
+    btn.classList.add('on'); btn.setAttribute('aria-current', 'true');
+    const p = btn.dataset.panel;
+    document.querySelectorAll('.panel').forEach(s => s.classList.remove('on'));
+    document.getElementById('panel-' + p).classList.add('on');
+    document.getElementById('topTitle').textContent = titles[p];
+    if (p === 'email') loadSmtp();
+  });
+});
+
+// logout
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  window.location = '/logout';
+});
+
+// ══════════════════════════════════════════════════════════════════
+// helpers
+// ══════════════════════════════════════════════════════════════════
+const CONNECTOR_COLORS = { menuworks: '#3A6EA5', crunchtime: '#C0712B' };
+const CONNECTOR_LABELS = { menuworks: 'MenuWorks', crunchtime: 'Crunchtime' };
+
+function pillHtml(status, detail) {
+  if (status === 'ok')   return `<span class="pill ok"><span class="dot"></span>Connected</span>`;
+  if (status === 'fail') {
+    const msg = detail ? 'Auth failed · ' + detail.slice(0, 30) : 'Auth failed';
+    return `<span class="pill fail" title="${esc(detail || '')}""><span class="dot"></span>${esc(msg)}</span>`;
+  }
+  return `<span class="pill idle"><span class="dot"></span>Untested</span>`;
+}
+
+function relativeTime(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60000)    return 'just now';
+  if (diff < 3600000)  return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  return Math.floor(diff / 86400000) + 'd ago';
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CONNECTIONS
+// ══════════════════════════════════════════════════════════════════
+let _connections = []; // in-memory cache
+
+function buildRow(conn) {
+  const color  = CONNECTOR_COLORS[conn.connector] || '#888';
+  const label  = CONNECTOR_LABELS[conn.connector] || conn.connector;
+  const buCell = conn.business_unit || '—';
+  const id     = conn.id;
+
+  const tr = document.createElement('tr');
+  tr.dataset.connId = id;
+  tr.innerHTML = `
+    <td><div class="cust">${esc(conn.customer_name)}</div>
+        <div class="sub">${esc(conn.connector)}-${esc(conn.environment)}</div></td>
+    <td><span class="sys"><span class="swatch" style="background:${color}"></span>${esc(label)}</span></td>
+    <td class="num">${esc(conn.environment)}</td>
+    <td class="num">${esc(buCell)}</td>
+    <td class="pill-cell">${pillHtml(conn.last_test_status, conn.last_test_detail)}</td>
+    <td class="num time-cell">${relativeTime(conn.last_test_at)}</td>
+    <td>
+      <div class="row-actions">
+        <button class="btn btn-ghost btn-test" aria-label="Test ${esc(conn.customer_name)} connection">Test</button>
+        <button class="btn btn-ghost btn-edit" aria-label="Edit ${esc(conn.customer_name)} connection">Edit</button>
+        <button class="btn btn-danger btn-delete" aria-label="Delete ${esc(conn.customer_name)} connection">Delete</button>
+      </div>
+    </td>`;
+  tr.querySelector('.btn-test').addEventListener('click', () => testConnection(id, tr));
+  tr.querySelector('.btn-edit').addEventListener('click', () => openEditForm(conn));
+  tr.querySelector('.btn-delete').addEventListener('click', () => deleteConnection(id, conn.customer_name, tr));
+  return tr;
+}
+
+function renderConnections(list) {
+  _connections = list;
+  const tbody = document.getElementById('connRows');
+  tbody.innerHTML = '';
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">
+      No connections yet — add one with the button above.
+    </td></tr>`;
+    return;
+  }
+
+  list.forEach(conn => tbody.appendChild(buildRow(conn)));
+  updateSchedulePanel();
+}
+
+async function loadConnections() {
+  const tbody = document.getElementById('connRows');
+  tbody.innerHTML = '<tr id="connLoadingRow"><td colspan="7" class="empty-state">Loading connections…</td></tr>';
+  try {
+    const res = await apiFetch('/api/connections');
+    if (!res.ok) throw new Error(await res.text());
+    const list = await res.json();
+    renderConnections(list);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">Failed to load connections: ${esc(e.message)}</td></tr>`;
+    toast('Failed to load connections', true);
+  }
+}
+
+async function testConnection(id, tr) {
+  const pillCell = tr.querySelector('.pill-cell');
+  const timeCell = tr.querySelector('.time-cell');
+  pillCell.innerHTML = '<span class="pill testing idle"><span class="dot"></span>Testing…</span>';
+  try {
+    const res = await apiFetch(`/api/connections/${id}/test`, { method: 'POST' });
+    const data = await res.json();
+    pillCell.innerHTML = pillHtml(data.status, data.detail);
+    timeCell.textContent = 'just now';
+    // update cache
+    const idx = _connections.findIndex(c => c.id === id);
+    if (idx >= 0) { _connections[idx].last_test_status = data.status; _connections[idx].last_test_detail = data.detail; _connections[idx].last_test_at = new Date().toISOString(); }
+    if (data.status === 'ok') {
+      toast('Connection test passed — ' + (data.detail || ''));
+    } else {
+      toast('Connection test failed: ' + (data.detail || 'unknown error'), true);
+    }
+  } catch (e) {
+    pillCell.innerHTML = '<span class="pill fail"><span class="dot"></span>Error</span>';
+    toast('Test request failed: ' + e.message, true);
+  }
+}
+
+async function deleteConnection(id, name, tr) {
+  if (!confirm(`Delete the connection for "${name}"? This cannot be undone.`)) return;
+  try {
+    const res = await apiFetch(`/api/connections/${id}`, { method: 'DELETE' });
+    if (res.status !== 204 && !res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || res.statusText);
+    }
+    tr.remove();
+    _connections = _connections.filter(c => c.id !== id);
+    if (document.getElementById('connRows').children.length === 0) {
+      renderConnections([]);
+    }
+    updateSchedulePanel();
+    toast(`${name} deleted`);
+  } catch (e) {
+    toast('Delete failed: ' + e.message, true);
+  }
+}
+
+// ── form ──────────────────────────────────────────────────────────
+const connForm = document.getElementById('connForm');
+
+function clearForm() {
+  document.getElementById('f-id').value = '';
+  document.getElementById('f-cust').value = '';
+  document.getElementById('f-sys').value = 'menuworks';
+  document.getElementById('f-env').value = 'prod';
+  document.getElementById('f-bu').value = '';
+  document.getElementById('f-wt').value = '';
+  document.getElementById('f-ibm').value = '';
+  document.getElementById('f-site').value = '';
+  document.getElementById('f-uid').value = '';
+  document.getElementById('f-tok').value = '';
+  document.getElementById('f-pwd').value = '';
+  document.getElementById('formTestNote').textContent = '';
+  document.getElementById('formTestNote').style.color = '';
+  syncCredFields();
+}
+
+document.getElementById('newConnBtn').addEventListener('click', () => {
+  clearForm();
+  document.getElementById('formTitle').textContent = 'New connection';
+  document.getElementById('formSave').textContent = 'Save connection';
+  connForm.hidden = false;
+  connForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('f-cust').focus();
+});
+
+document.getElementById('formCancel').addEventListener('click', () => {
+  connForm.hidden = true;
+});
+
+function openEditForm(conn) {
+  clearForm();
+  document.getElementById('formTitle').textContent = 'Edit connection';
+  document.getElementById('formSave').textContent = 'Save changes';
+  document.getElementById('f-id').value = conn.id;
+  document.getElementById('f-cust').value = conn.customer_name || '';
+  document.getElementById('f-sys').value = conn.connector || 'menuworks';
+  document.getElementById('f-env').value = conn.environment || 'prod';
+  document.getElementById('f-bu').value = conn.business_unit || '';
+  // secret fields left blank — blanks = preserve existing on PUT
+  syncCredFields();
+  connForm.hidden = false;
+  connForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('f-cust').focus();
+}
+
+// adaptive credential fields
+const sysSel = document.getElementById('f-sys');
+function syncCredFields() {
+  document.querySelectorAll('.cred-group').forEach(g => {
+    g.hidden = g.dataset.system !== sysSel.value;
+  });
+}
+sysSel.addEventListener('change', syncCredFields);
+syncCredFields();
+
+function buildSecretsPayload(connector) {
+  if (connector === 'menuworks') {
+    const s = {};
+    const wt = document.getElementById('f-wt').value.trim();
+    const ibm = document.getElementById('f-ibm').value.trim();
+    if (wt)  s.wt_client_id = wt;
+    if (ibm) s.ibm_client_id = ibm;
+    return Object.keys(s).length ? s : null;
+  } else {
+    const s = {};
+    const site = document.getElementById('f-site').value.trim();
+    const uid  = document.getElementById('f-uid').value.trim();
+    const tok  = document.getElementById('f-tok').value.trim();
+    const pwd  = document.getElementById('f-pwd').value.trim();
+    if (site) s.sitename = site;
+    if (uid)  s.userid = uid;
+    if (tok)  s.authenticationtoken = tok;
+    if (pwd)  s.password = pwd;
+    return Object.keys(s).length ? s : null;
+  }
+}
+
+document.getElementById('formSave').addEventListener('click', async () => {
+  const id         = document.getElementById('f-id').value;
+  const customer   = document.getElementById('f-cust').value.trim();
+  const connector  = sysSel.value;
+  const env        = document.getElementById('f-env').value;
+  const bu         = connector === 'menuworks' ? document.getElementById('f-bu').value.trim() : null;
+  const secrets    = buildSecretsPayload(connector);
+
+  if (!customer) { toast('Customer name is required', true); return; }
+
+  const body = { customer_name: customer, connector, environment: env, enabled: true };
+  if (bu) body.business_unit = bu;
+  if (secrets) body.secrets = secrets;
+
+  const saveBtn = document.getElementById('formSave');
+  saveBtn.disabled = true;
+  try {
+    let res, data;
+    if (id) {
+      // Edit mode — PUT
+      res = await apiFetch(`/api/connections/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } else {
+      // New — POST
+      if (!secrets) { toast('Enter at least one credential field', true); saveBtn.disabled = false; return; }
+      res = await apiFetch('/api/connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+    data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+
+    connForm.hidden = true;
+
+    if (id) {
+      // Update existing row in DOM
+      const idx = _connections.findIndex(c => c.id === id);
+      if (idx >= 0) _connections[idx] = data;
+      const existingRow = document.querySelector(`tr[data-conn-id="${id}"]`);
+      if (existingRow) existingRow.replaceWith(buildRow(data));
+      toast(`${customer} updated`);
+    } else {
+      // Prepend new row
+      _connections.unshift(data);
+      const tbody = document.getElementById('connRows');
+      // Remove empty state row if present
+      const emptyRow = tbody.querySelector('td[colspan]');
+      if (emptyRow) emptyRow.closest('tr').remove();
+      tbody.prepend(buildRow(data));
+      updateSchedulePanel();
+      toast(`${customer} added`);
+    }
+  } catch (e) {
+    toast('Save failed: ' + e.message, true);
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+// form test button (tests the row if editing, otherwise just gives feedback)
+document.getElementById('formTestBtn').addEventListener('click', async () => {
+  const id   = document.getElementById('f-id').value;
+  const note = document.getElementById('formTestNote');
+  if (!id) {
+    note.textContent = 'Save the connection first to test it.';
+    note.style.color = 'var(--ink-3)';
+    return;
+  }
+  note.textContent = 'Testing…';
+  note.style.color = 'var(--ink-3)';
+  try {
+    const res = await apiFetch(`/api/connections/${id}/test`, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      note.textContent = '✓ ' + (data.detail || 'Connected');
+      note.style.color = 'var(--ok)';
+      toast('Connection test passed');
+    } else {
+      note.textContent = '✗ ' + (data.detail || 'Failed');
+      note.style.color = 'var(--fail)';
+      toast('Connection test failed: ' + (data.detail || ''), true);
+    }
+    // refresh row pill
+    const tr = document.querySelector(`tr[data-conn-id="${id}"]`);
+    if (tr) {
+      tr.querySelector('.pill-cell').innerHTML = pillHtml(data.status, data.detail);
+      tr.querySelector('.time-cell').textContent = 'just now';
+    }
+  } catch (e) {
+    note.textContent = '✗ ' + e.message;
+    note.style.color = 'var(--fail)';
+    toast('Test request failed: ' + e.message, true);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// SCHEDULE panel — populated from connections / smtp data
+// ══════════════════════════════════════════════════════════════════
+function updateSchedulePanel() {
+  const enabled = _connections.filter(c => c.enabled);
+  const names   = enabled.map(c => c.customer_name).join(', ');
+  document.getElementById('schedConnCount').textContent =
+    enabled.length + ' of ' + _connections.length + (names ? ' · ' + names : '');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SMTP
+// ══════════════════════════════════════════════════════════════════
+let _smtpLoaded = false;
+let _recipients = [];
+
+function renderRecipients() {
+  const chips = document.getElementById('rcptChips');
+  // Remove existing tags
+  chips.querySelectorAll('.tag').forEach(t => t.remove());
+  const input = document.getElementById('s-rcpt');
+  _recipients.forEach(email => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = `${esc(email)} <span class="rm" role="button" aria-label="Remove ${esc(email)}" tabindex="0">✕</span>`;
+    tag.querySelector('.rm').addEventListener('click', () => {
+      _recipients = _recipients.filter(e => e !== email);
+      renderRecipients();
+    });
+    tag.querySelector('.rm').addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tag.querySelector('.rm').click(); }
+    });
+    chips.insertBefore(tag, input);
+  });
+}
+
+document.getElementById('s-rcpt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = e.target.value.trim().replace(/,$/, '');
+    if (val && !_recipients.includes(val)) {
+      _recipients.push(val);
+      renderRecipients();
+    }
+    e.target.value = '';
+  }
+});
+
+// clicking the chips container focuses the input
+document.getElementById('rcptChips').addEventListener('click', e => {
+  if (e.target.closest('.tag')) return;
+  document.getElementById('s-rcpt').focus();
+});
+
+async function loadSmtp() {
+  if (_smtpLoaded) return;
+  try {
+    const res = await apiFetch('/api/smtp');
+    if (!res.ok) throw new Error(await res.text());
+    const d = await res.json();
+    if (d && d.host) {
+      document.getElementById('s-host').value = d.host || '';
+      document.getElementById('s-port').value = d.port || '';
+      // Security mapping
+      const secMap = { starttls: 'starttls', ssl: 'ssl', none: 'none' };
+      document.getElementById('s-sec').value = secMap[d.security] || 'starttls';
+      document.getElementById('s-user').value = d.username || '';
+      // password shown as masked placeholder — don't fill the field
+      document.getElementById('s-from').value = d.from_addr || '';
+      _recipients = Array.isArray(d.recipients) ? [...d.recipients] : [];
+      renderRecipients();
+      document.getElementById('s-enabled').checked = !!d.enabled;
+      // update schedule panel
+      document.getElementById('schedEmailStatus').textContent = d.enabled ? 'on' : 'off';
+    }
+    _smtpLoaded = true;
+  } catch (e) {
+    toast('Failed to load SMTP config: ' + e.message, true);
+  }
+}
+
+document.getElementById('smtpSave').addEventListener('click', async () => {
+  const body = {
+    host:       document.getElementById('s-host').value.trim(),
+    port:       parseInt(document.getElementById('s-port').value, 10) || 587,
+    security:   document.getElementById('s-sec').value,
+    username:   document.getElementById('s-user').value.trim(),
+    from_addr:  document.getElementById('s-from').value.trim(),
+    recipients: [..._recipients],
+    enabled:    document.getElementById('s-enabled').checked,
+  };
+  const pw = document.getElementById('s-pass').value;
+  if (pw) body.password = pw;  // omit to preserve existing
+
+  const btn = document.getElementById('smtpSave');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch('/api/smtp', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || res.statusText);
+    document.getElementById('s-pass').value = ''; // clear after save
+    _smtpLoaded = false; // force re-load on next visit
+    document.getElementById('schedEmailStatus').textContent = data.enabled ? 'on' : 'off';
+    toast('SMTP settings saved');
+  } catch (e) {
+    toast('Save failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('smtpTestBtn').addEventListener('click', async () => {
+  const note = document.getElementById('smtpTestNote');
+  note.textContent = 'Sending…';
+  note.style.color = 'var(--ink-3)';
+  const btn = document.getElementById('smtpTestBtn');
+  btn.disabled = true;
+  try {
+    const res = await apiFetch('/api/smtp/test', { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      note.textContent = '✓ ' + (data.detail || 'Test email sent');
+      note.style.color = 'var(--ok)';
+      toast(data.detail || 'Test email sent');
+    } else {
+      note.textContent = '✗ ' + (data.detail || 'Failed');
+      note.style.color = 'var(--fail)';
+      toast('SMTP test failed: ' + (data.detail || ''), true);
+    }
+  } catch (e) {
+    note.textContent = '✗ ' + e.message;
+    note.style.color = 'var(--fail)';
+    toast('SMTP test failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// boot
+// ══════════════════════════════════════════════════════════════════
+loadConnections();
+</script>
