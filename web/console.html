@@ -151,7 +151,12 @@
   .fmt-type-service   { background: #A5A5A5; color: #fff; }
   .fmt-type-menu      { background: #70AD47; color: #fff; }
   .fmt-section { margin-bottom: 28px; }
-  .fmt-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
+  .fmt-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--line); cursor: pointer; user-select: none; }
+  .fmt-section-header:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+  .fmt-chevron { margin-left: auto; color: var(--ink-3); transition: transform .15s; flex-shrink: 0; }
+  .fmt-section.collapsed .fmt-items { display: none; }
+  .fmt-section.collapsed .fmt-chevron { transform: rotate(-90deg); }
+  .fmt-section-hint { font-size: 11px; color: var(--ink-3); font-weight: 500; }
   .fmt-section-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
   .fmt-count-badge { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--mono); min-width: 24px; height: 20px; padding: 0 6px; border-radius: 10px; }
   .fmt-item-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; margin-bottom: 8px; }
@@ -1226,10 +1231,13 @@ function fmtRender(data) {
     const list = items[type] || [];
     const color = TYPE_COLORS[type] || '#888';
     html += `
-      <div class="fmt-section" data-section="${esc(type)}">
-        <div class="fmt-section-header">
+      <div class="fmt-section${type === 'stock' ? ' collapsed' : ''}" data-section="${esc(type)}">
+        <div class="fmt-section-header" role="button" tabindex="0" aria-expanded="${type === 'stock' ? 'false' : 'true'}">
           <span class="fmt-count-badge" style="background:${color};color:#fff">${list.length}</span>
           <span class="fmt-section-title" style="color:${color}">${esc(type.charAt(0).toUpperCase() + type.slice(1))}</span>
+          ${type === 'stock' ? '<span class="fmt-section-hint">leaf ingredients — click to expand</span>' : ''}
+          ${type === 'inventory' ? '<span class="fmt-section-hint">recipes (prep)</span>' : ''}
+          <svg class="fmt-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
         <div class="fmt-items" data-type="${esc(type)}">
           ${list.length === 0
@@ -1273,9 +1281,29 @@ document.getElementById('fmtRefreshBtn').addEventListener('click', () => {
   loadFormat(true);
 });
 
+// Collapse / expand a section by clicking (or Enter/Space on) its header
+function fmtToggleSection(header) {
+  const sec = header.closest('.fmt-section');
+  if (!sec) return;
+  const collapsed = sec.classList.toggle('collapsed');
+  header.setAttribute('aria-expanded', String(!collapsed));
+}
+document.getElementById('fmtBody').addEventListener('click', e => {
+  const h = e.target.closest('.fmt-section-header');
+  if (h) fmtToggleSection(h);
+});
+document.getElementById('fmtBody').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('fmt-section-header')) {
+    e.preventDefault();
+    fmtToggleSection(e.target);
+  }
+});
+
 // Search / filter
 document.getElementById('fmtSearch').addEventListener('input', function () {
   const q = this.value.trim().toLowerCase();
+  // While searching, expand every section so matches are never hidden inside a collapsed one
+  if (q) document.querySelectorAll('#fmtBody .fmt-section').forEach(s => s.classList.remove('collapsed'));
   document.querySelectorAll('#fmtBody .fmt-item-card').forEach(card => {
     const name = card.dataset.name || '';
     card.classList.toggle('fmt-hidden', q.length > 0 && !name.includes(q));
