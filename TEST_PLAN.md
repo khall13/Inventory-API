@@ -59,3 +59,21 @@ missing-detail skip, record-level error skip + sweep suppression, and auth-error
 | TC-017 | P1 | edge | 3.0 spec endpoint shape differs from 3.1.3 reference | `--pages 1 --dump` reveals mismatch; `records_key`/keys corrected per live sample |
 | TC-018 | P0 | failure | Only Production granted; QA `X-IBM-Client-Id` used against prod | rejected; documents that the per-env IBM id must match the env |
 | TC-019 | regression | — | Crunchtime connector + existing `options_json` pager unaffected by the dual-header change | `sync.py --smoke --connector crunchtime` unchanged; TC-001…010 still pass |
+
+---
+
+## Feature: Setup Console (web service — login + connections + SMTP) — TBD
+
+- **Date:** 2026-06-30 · **Stack:** FastAPI + Jinja2 + Postgres (`web/`).
+- Auth/page tests run with no DB (`web/tests/test_app.py`). DB + live tests need `DATABASE_URL` + creds.
+
+| ID | Pri | Type | Scenario | Expected | Status |
+|---|---|---|---|---|---|
+| TC-020 | P0 | happy | Create a MenuWorks connection via `POST /api/connections` | row persisted; `secrets` Fernet-encrypted; response masked | ✅ live |
+| TC-021 | P0 | happy | `POST /api/connections/{id}/test` with the live Compass creds | `200` / `status=ok`; matches CLI smoke | ✅ live (detail=`…/stg`) |
+| TC-022 | P0 | failure | Test with a bad IBM id | `fail`; detail surfaced; never 500 | pending |
+| TC-023 | P1 | edge | `GET /api/connections` never returns plaintext secrets | values masked; plaintext absent | ✅ live |
+| TC-024 | P0 | happy | `POST /api/smtp/test` with valid creds | test email sent; `ok` | pending (needs SMTP) |
+| TC-025 | P0 | failure | `/api/*` without a session | `401 unauthorized` | ✅ live + unit |
+| TC-026 | P0 | happy | token login → session cookie → console served | wrong token `401`; correct → `303` + cookie; `/` returns console | ✅ unit |
+| TC-027 | regression | — | `make_client()` default path (no `env`/`secret_values`) unchanged | TC-011/012 + crunchtime smoke still pass | ✅ (menuworks + mw_recipes green) |

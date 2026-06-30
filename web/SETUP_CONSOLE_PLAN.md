@@ -3,7 +3,10 @@
 **Feature:** A web UI to onboard new customer API connections (Crunchtime / MenuWorks) and configure
 the SMTP "what changed" email — replacing hand-editing `.env` + `connectors.yaml`.
 **Ticket:** TBD
-**Status:** 📋 Plan + HTML sample — for review
+**Status:** 🟢 Phases 1–2 built + live-proven 2026-06-30 (login, connections CRUD, encrypted
+secrets, live `test` endpoint against Compass Prod). Decisions locked: **single `ADMIN_TOKEN` +
+login page**; **layering** (DB connections win, `.env` fallback). Remaining: SMTP test (TC-024),
+FE→API wiring (Phase 4), deploy `inventory-web` (Phase 5).
 **Date:** 2026-06-30
 **Stack:** Python (FastAPI) backend + static HTML/JS frontend, PostgreSQL, Railway
 **Sample:** [`setup-console.sample.html`](setup-console.sample.html) (rendered as an Artifact)

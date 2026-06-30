@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — Inventory API Setup Console</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ground:      #EEF0F3;
+      --surface:     #FFFFFF;
+      --line:        #E0E3E9;
+      --ink:         #1B2029;
+      --ink-2:       #5A6473;
+      --ink-3:       #8A93A2;
+      --copper:      #B4612A;
+      --copper-dk:   #97501F;
+      --copper-tint: #F6ECE3;
+      --fail:        #C0392B;
+      --fail-tint:   #FAE9E7;
+      --r:           8px;
+      --sans:        ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+      --mono:        ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, monospace;
+    }
+
+    body {
+      background: var(--ground);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 40px 36px 36px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 2px 12px rgba(27,32,41,.07);
+    }
+
+    /* ── brand mark ── */
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--r);
+      background: var(--copper);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .brand-mark svg {
+      width: 19px;
+      height: 19px;
+      fill: none;
+      stroke: #fff;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .brand-text {}
+    .brand-name {
+      font-weight: 650;
+      font-size: 14px;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .brand-sub {
+      font-size: 10.5px;
+      color: var(--ink-3);
+      font-family: var(--mono);
+      letter-spacing: 0.03em;
+    }
+
+    h1 {
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+    .sub {
+      font-size: 13px;
+      color: var(--ink-2);
+      margin-bottom: 24px;
+    }
+
+    /* ── form ── */
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+    label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-family: var(--sans);
+      font-size: 14px;
+      color: var(--ink);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input[type="password"]:focus {
+      border-color: var(--copper);
+      box-shadow: 0 0 0 3px var(--copper-tint);
+    }
+    input[type="password"]:focus-visible {
+      outline: 2px solid var(--copper);
+      outline-offset: 2px;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      background: var(--copper);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn:hover { background: var(--copper-dk); }
+    .btn:focus-visible {
+      outline: 2px solid var(--copper);
+      outline-offset: 3px;
+    }
+
+    /* ── error ── */
+    .error {
+      background: var(--fail-tint);
+      border: 1px solid #f0b8b3;
+      color: var(--fail);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .error svg {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      fill: none;
+      stroke: var(--fail);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <!-- plug icon -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2v4M8 6h8M7 6v5a5 5 0 0 0 10 0V6M9 15.5V22M15 15.5V22"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">Inventory API</div>
+        <div class="brand-sub">Setup Console</div>
+      </div>
+    </div>
+
+    <h1>Sign in</h1>
+    <p class="sub">Enter your admin token to continue.</p>
+
+    {% if error %}
+    <div class="error" role="alert">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/login" novalidate>
+      <div class="field">
+        <label for="token">Admin token</label>
+        <input
+          type="password"
+          id="token"
+          name="token"
+          autocomplete="current-password"
+          required
+          autofocus
+          placeholder="••••••••••••"
+        >
+      </div>
+      <button type="submit" class="btn">Sign in</button>
+    </form>
+
+  </div>
+</body>
+</html>
