@@ -5,9 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "python scripts/sync.py --init-db && python scripts/sync.py --domain all --mode incremental --email",
-    "cronSchedule": "0 8 * * *",
-    "restartPolicyType": "NEVER",
+    "restartPolicyType": "ON_FAILURE",
     "numReplicas": 1
   }
 }

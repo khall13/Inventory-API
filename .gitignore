@@ -8,3 +8,6 @@ samples/*.json
 MenuWorks/MenuWorks_Connection.md
 
 .DS_Store
+
+# Railway config-as-code scratch
+.railway*/

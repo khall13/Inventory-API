@@ -5,7 +5,6 @@ COPY scripts/requirements.txt scripts/requirements.txt
 RUN pip install --no-cache-dir -r scripts/requirements.txt
 COPY . .
 
-# Default = the daily job. Railway's cron schedule (railway.json deploy.cronSchedule)
-# decides WHEN this runs; the container runs once to completion and exits.
-# init-db is idempotent (all DDL is IF NOT EXISTS) so it's safe to run every time.
-CMD ["sh", "-c", "python scripts/sync.py --init-db && python scripts/sync.py --domain all --mode incremental --email"]
+# Role-based entrypoint: $SERVICE_ROLE picks web (uvicorn) vs sync (ELT job).
+# Same image serves both Railway services; see entrypoint.sh.
+CMD ["sh", "entrypoint.sh"]
