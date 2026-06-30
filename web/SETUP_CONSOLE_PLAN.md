@@ -3,10 +3,11 @@
 **Feature:** A web UI to onboard new customer API connections (Crunchtime / MenuWorks) and configure
 the SMTP "what changed" email — replacing hand-editing `.env` + `connectors.yaml`.
 **Ticket:** TBD
-**Status:** 🟢 Phases 1–2 + **5 deployed live** 2026-06-30. Login, connections CRUD, encrypted
-secrets, live `test` endpoint (Compass Prod 200), and the web service are all proven in production.
-Decisions locked: **single `ADMIN_PASSWORD` + login page**; **layering** (DB connections win, `.env`
-fallback). Remaining: SMTP test (TC-024), FE→API wiring (Phase 4).
+**Status:** 🟢 Phases 1–5 **deployed & live-verified** 2026-06-30. Password login, the API-wired
+console (connections CRUD + per-row live test + SMTP config), encrypted secrets, and graceful
+failure paths (TC-022 bad-cred `403`, TC-024 no-SMTP) all pass against the deployed site.
+Decisions locked: **`ADMIN_PASSWORD` sign-in (rotatable in Railway)**; **layering** (DB wins, `.env`
+fallback). Remaining: a full SMTP send once mail creds are entered (TC-024 happy path).
 
 ### Deployment (live)
 - **URL:** https://inventory-web-production-c606.up.railway.app  (`/login` → password; set/rotate via Railway `inventory-web` var `ADMIN_PASSWORD`)

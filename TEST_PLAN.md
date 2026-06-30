@@ -71,9 +71,9 @@ missing-detail skip, record-level error skip + sweep suppression, and auth-error
 |---|---|---|---|---|---|
 | TC-020 | P0 | happy | Create a MenuWorks connection via `POST /api/connections` | row persisted; `secrets` Fernet-encrypted; response masked | ✅ live |
 | TC-021 | P0 | happy | `POST /api/connections/{id}/test` with the live Compass creds | `200` / `status=ok`; matches CLI smoke | ✅ live (detail=`…/stg`) |
-| TC-022 | P0 | failure | Test with a bad IBM id | `fail`; detail surfaced; never 500 | pending |
+| TC-022 | P0 | failure | Test with a bad IBM id | `fail`; detail surfaced; never 500 | ✅ live (`fail`, "HTTP 403") |
 | TC-023 | P1 | edge | `GET /api/connections` never returns plaintext secrets | values masked; plaintext absent | ✅ live |
-| TC-024 | P0 | happy | `POST /api/smtp/test` with valid creds | test email sent; `ok` | pending (needs SMTP) |
+| TC-024 | P0 | happy | `POST /api/smtp/test` | graceful on no-config; sends `ok` with creds | ✅ graceful ("SMTP not configured"); full send pending creds |
 | TC-025 | P0 | failure | `/api/*` without a session | `401 unauthorized` | ✅ live + unit |
-| TC-026 | P0 | happy | token login → session cookie → console served | wrong token `401`; correct → `303` + cookie; `/` returns console | ✅ unit |
+| TC-026 | P0 | happy | **password** login → session cookie → console served | wrong pw `401`; correct → `303` + cookie; `/` serves wired console | ✅ live + unit |
 | TC-027 | regression | — | `make_client()` default path (no `env`/`secret_values`) unchanged | TC-011/012 + crunchtime smoke still pass | ✅ (menuworks + mw_recipes green) |
