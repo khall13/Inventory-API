@@ -82,6 +82,33 @@ def test_record_level_error_skipped_not_fatal():  # TC-008 / Must-Fix #1
     assert dom["_sweep_safe"] is False
 
 
+def test_recurses_into_subrecipes():  # recursive closure — sub-recipes get landed, not stocked
+    prods = [{"mrn": "100", "productType": "Recipe", "name": "Parent"}]
+    detail = {
+        "100": {"data": {"recipe": {"mrn": "100", "name": "Parent", "ingredients": [
+            {"mrn": "500", "type": "Recipe", "name": "Sub", "quantity": 1},
+            {"mrn": "9", "type": "Ingredient", "name": "Salt", "quantity": 1}]}}},
+        # 500 is only reachable by recursing into 100's ingredients (not in the products page)
+        "500": {"data": {"recipe": {"mrn": "500", "name": "Sub", "ingredients": [
+            {"mrn": "8", "type": "Ingredient", "name": "Water", "quantity": 1}]}}},
+    }
+    c = FakeClient(prods, detail)
+    dom = {"name": "mw_recipes", "page_size": 100}
+    recs = [r for _, b in h.iter_records(c, dom) for r in b]
+    assert sorted(r["mrn"] for r in recs) == ["100", "500"], [r["mrn"] for r in recs]
+    assert "500" in c.detail_calls                                    # fetched via recursion
+
+
+def test_recursion_can_be_disabled():
+    prods = [{"mrn": "100", "productType": "Recipe", "name": "Parent"}]
+    detail = {"100": {"data": {"recipe": {"mrn": "100", "ingredients": [
+        {"mrn": "500", "type": "Recipe", "name": "Sub", "quantity": 1}]}}},
+        "500": {"data": {"recipe": {"mrn": "500"}}}}
+    c = FakeClient(prods, detail)
+    recs = [r for _, b in h.iter_records(c, {"name": "x", "page_size": 100, "recurse_subrecipes": False}) for r in b]
+    assert [r["mrn"] for r in recs] == ["100"] and "500" not in c.detail_calls
+
+
 def test_auth_error_aborts():  # Must-Fix #1 — 401 must propagate
     c = FakeClient([_products()[0]], {"100": ApiError(401, ["unauthorized"])})
     try:

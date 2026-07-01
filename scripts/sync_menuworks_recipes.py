@@ -3,7 +3,9 @@
 MenuWorks has no bulk "recipes-with-details by page" endpoint, so we:
   Stage 1 — page /business_units/{unit}/products filtered to productType=Recipe → recipe mrns.
   Stage 2 — GET /business_units/{unit}/recipes/{mrn} per mrn (with `include` flags), extract
-            data.recipe, and yield in batches.
+            data.recipe, and yield in batches. RECURSES into ingredients whose type=="Recipe"
+            (sub-recipes) so the whole recipe graph is landed — an unlanded sub-recipe would be
+            mis-filed as Stock downstream. Disable with dom['recurse_subrecipes']=False.
 
 Exposes `iter_records(client, dom, max_pages=None)` → Iterator[(batch_no, [recipe_dict])], the
 record-source contract sync.py expects. Raw landing, change detection, and sync_state are handled
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import deque
 from typing import Iterator, Protocol
 from urllib.parse import quote
 
@@ -83,12 +86,24 @@ def iter_records(client: _Client, dom: dict, max_pages: int | None = None) -> It
         mrns = mrns[: max_pages * page_size]
     log.info("stage 1: %d Recipe mrns to fetch", len(mrns))
 
-    # ── Stage 2: fetch each recipe's detail, yield in batches ─────────────────
+    # ── Stage 2: fetch each recipe's detail; recurse into sub-recipes, yield in batches ──
+    # A recipe's ingredients can themselves be recipes (ingredient type == "Recipe"). We BFS
+    # into those so every referenced prep item is landed — otherwise an unlanded sub-recipe is
+    # mis-filed as Stock downstream. `seen` (from Stage 1) dedupes and breaks cycles.
+    recurse = dom.get("recurse_subrecipes", True)
+    max_fetch = dom.get("max_fetch", 5000)          # safety cap against a runaway/cyclic graph
     options = json.dumps({"include": include})
+    queue: deque = deque(mrns)                       # `seen` already contains these
     batch: list[dict] = []
     batch_no = 0
     skipped = 0
-    for i, mrn in enumerate(mrns, 1):
+    fetched = 0
+    while queue:
+        if fetched >= max_fetch:
+            log.warning("stage 2: hit max_fetch=%d — stopping (graph may be incomplete)", max_fetch)
+            dom["_sweep_safe"] = False
+            break
+        mrn = queue.popleft()
         try:
             body = client.get(recipe_tmpl.format(mrn=quote(str(mrn), safe="")), {"options": options})
         except ApiError as e:
@@ -104,10 +119,19 @@ def iter_records(client: _Client, dom: dict, max_pages: int | None = None) -> It
             skipped += 1
             continue
         recipe.setdefault("mrn", mrn)   # ensure the natural key is present
+        fetched += 1
         batch.append(recipe)
+        # Recurse: enqueue sub-recipe (type=Recipe) ingredients not yet seen.
+        if recurse:
+            for ing in recipe.get("ingredients") or []:
+                if str(ing.get("type") or "").lower() == "recipe" and ing.get("mrn") is not None:
+                    sub = str(ing.get("mrn"))
+                    if sub not in seen:
+                        seen.add(sub)
+                        queue.append(sub)
         if len(batch) >= batch_size:
             batch_no += 1
-            log.info("stage 2: batch %d (%d/%d recipes fetched)", batch_no, i, len(mrns))
+            log.info("stage 2: batch %d (%d fetched, %d queued)", batch_no, fetched, len(queue))
             yield batch_no, batch
             batch = []
     if batch:
