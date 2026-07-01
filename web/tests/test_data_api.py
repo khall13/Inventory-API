@@ -92,14 +92,20 @@ def test_export_csv_bad_db_does_not_500():
 
 # ── TC-DATA-005 ───────────────────────────────────────────────────────────────
 def test_whitelist_loaded():
-    """The whitelist must contain at least the known domains from endpoints.yaml."""
+    """The whitelist must contain at least the known domains from endpoints.yaml.
+
+    Each entry is now a dict with 'table' and 'connector' keys (updated when
+    _DATASET_WHITELIST was extended to carry per-domain connector info).
+    """
     whitelist = _app_module._DATASET_WHITELIST
     assert isinstance(whitelist, dict), "whitelist is not a dict"
     assert len(whitelist) > 0, "whitelist is empty — endpoints.yaml may not have loaded"
     # mw_products is a stable domain in endpoints.yaml
     assert "mw_products" in whitelist, f"mw_products missing from whitelist: {list(whitelist)}"
-    # All values should be schema-qualified raw.* table names
-    for domain, table in whitelist.items():
+    # All entries should be dicts with schema-qualified raw.* table names
+    for domain, entry in whitelist.items():
+        assert isinstance(entry, dict), f"{domain!r}: entry is not a dict: {entry!r}"
+        table = entry.get("table", "")
         assert "." in table, f"raw_table for {domain!r} is not schema-qualified: {table!r}"
 
 

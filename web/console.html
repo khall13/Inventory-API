@@ -404,8 +404,16 @@
         <div>
           <div class="eyebrow">Synced records</div>
           <h2>Data</h2>
-          <p>Browse records landed in each raw dataset. Select a dataset to preview the most recent 50 rows, or download the full table as CSV.</p>
+          <p>Browse records landed in each raw dataset. Select a customer, then select a dataset to preview the most recent 50 rows, or download the full table as CSV.</p>
         </div>
+      </div>
+
+      <div class="field" style="max-width:420px;margin-bottom:18px">
+        <label for="dataCustSelect">Customer</label>
+        <select id="dataCustSelect" aria-label="Select customer to view data for"></select>
+      </div>
+      <div id="dataNoCust" hidden style="color:var(--ink-3);font-size:13px;margin-bottom:16px">
+        No customers yet — add one on the Connections page.
       </div>
 
       <div id="dsChipsWrap" class="ds-chips">
@@ -436,12 +444,20 @@
         <div>
           <div class="eyebrow">TastEOS item model</div>
           <h2>Format</h2>
-          <p>How each MenuWorks recipe maps to the TastEOS item model (Stock → Inventory → Service → Menu).</p>
+          <p>How each source system's recipes map to the TastEOS item model (Stock → Inventory → Service → Menu). Select a customer to scope the preview.</p>
         </div>
         <button class="btn" id="fmtRefreshBtn">
           <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 14.9-3.9M20 12a8 8 0 0 1-14.9 3.9M4 4v5h5M20 20v-5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Refresh
         </button>
+      </div>
+
+      <div class="field" style="max-width:420px;margin-bottom:18px">
+        <label for="fmtCustSelect">Customer</label>
+        <select id="fmtCustSelect" aria-label="Select customer to view format for"></select>
+      </div>
+      <div id="fmtNoCust" hidden style="color:var(--ink-3);font-size:13px;margin-bottom:16px">
+        No customers yet — add one on the Connections page.
       </div>
 
       <div id="fmtFlagsSection" class="fmt-flags-section" hidden>
@@ -1001,23 +1017,86 @@ document.getElementById('smtpTestBtn').addEventListener('click', async () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// CUSTOMER DROPDOWN  (shared loader; populates both panels)
+// ══════════════════════════════════════════════════════════════════
+let _customers = null;  // null = not yet loaded; [] = loaded but empty
+
+async function _loadCustomers() {
+  if (_customers !== null) return _customers;
+  try {
+    const res = await apiFetch('/api/customers');
+    if (!res.ok) throw new Error(await res.text());
+    _customers = await res.json();
+  } catch (e) {
+    console.warn('Failed to load customers', e);
+    _customers = [];
+  }
+  return _customers;
+}
+
+// Track per-select change handlers so we can replace (not stack) them.
+const _custSelectHandlers = new WeakMap();
+
+function _populateCustSelect(selectEl, noCustEl, onChange) {
+  // Remove any previously registered handler to avoid stacking listeners.
+  const prev = _custSelectHandlers.get(selectEl);
+  if (prev) selectEl.removeEventListener('change', prev);
+
+  selectEl.innerHTML = '';
+  if (!_customers || !_customers.length) {
+    selectEl.hidden = true;
+    noCustEl.hidden = false;
+    return false;  // no customers
+  }
+  selectEl.hidden = false;
+  noCustEl.hidden = true;
+  _customers.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.connector;
+    opt.dataset.connId = c.id;
+    opt.textContent = `${c.customer_name} · ${c.connector}/${c.environment}`;
+    selectEl.appendChild(opt);
+  });
+  selectEl.addEventListener('change', onChange);
+  _custSelectHandlers.set(selectEl, onChange);
+  return true;  // has customers
+}
+
+// ══════════════════════════════════════════════════════════════════
 // DATA PANEL
 // ══════════════════════════════════════════════════════════════════
-let _datasetsLoaded = false;
 let _activeDataset = null;
 
 async function loadDatasets() {
-  if (_datasetsLoaded) return;
+  await _loadCustomers();
+  const sel     = document.getElementById('dataCustSelect');
+  const noCust  = document.getElementById('dataNoCust');
+  const wrap    = document.getElementById('dsChipsWrap');
+
+  const hasCust = _populateCustSelect(sel, noCust, () => _loadDatasetsForConnector(sel.value));
+
+  if (!hasCust) {
+    wrap.innerHTML = '';
+    document.getElementById('dataPreviewSection').hidden = true;
+    return;
+  }
+
+  // Auto-select first customer
+  await _loadDatasetsForConnector(sel.value);
+}
+
+async function _loadDatasetsForConnector(connector) {
   const wrap = document.getElementById('dsChipsWrap');
   wrap.innerHTML = '<span class="data-caption" id="dsChipsLoading">Loading datasets…</span>';
+  document.getElementById('dataPreviewSection').hidden = true;
+  _activeDataset = null;
   try {
-    const res = await apiFetch('/api/data/datasets');
+    const res = await apiFetch('/api/data/datasets?connector=' + encodeURIComponent(connector));
     if (!res.ok) throw new Error(await res.text());
     const list = await res.json();
     wrap.innerHTML = '';
     if (!list.length) {
-      wrap.innerHTML = '<span class="data-caption">No datasets synced yet.</span>';
-      _datasetsLoaded = true;
+      wrap.innerHTML = `<span class="data-caption">No datasets for ${esc(connector)}.</span>`;
       return;
     }
     list.forEach(ds => {
@@ -1028,7 +1107,6 @@ async function loadDatasets() {
       btn.addEventListener('click', () => selectDataset(ds.dataset, ds.count));
       wrap.appendChild(btn);
     });
-    _datasetsLoaded = true;
   } catch (e) {
     wrap.innerHTML = `<span class="data-caption" style="color:var(--fail)">Failed to load datasets: ${esc(e.message)}</span>`;
     toast('Failed to load datasets', true);
@@ -1259,13 +1337,33 @@ function fmtRender(data) {
 }
 
 async function loadFormat(force = false) {
+  await _loadCustomers();
+  const sel    = document.getElementById('fmtCustSelect');
+  const noCust = document.getElementById('fmtNoCust');
+
+  const hasCust = _populateCustSelect(sel, noCust, () => {
+    _fmtLoaded = false;
+    _loadFormatForConnector(sel.value);
+  });
+
+  if (!hasCust) {
+    const container = document.getElementById('fmtBody');
+    container.innerHTML = '';
+    document.getElementById('fmtFlagsSection').hidden = true;
+    return;
+  }
+
   if (_fmtLoaded && !force) return;
+  await _loadFormatForConnector(sel.value);
+}
+
+async function _loadFormatForConnector(connector) {
   const container = document.getElementById('fmtBody');
   container.innerHTML = '<div class="empty-state" id="fmtLoading">Loading…</div>';
   document.getElementById('fmtFlagsSection').hidden = true;
   document.getElementById('fmtSearch').value = '';
   try {
-    const res = await apiFetch('/api/format/preview');
+    const res = await apiFetch('/api/format/preview?connector=' + encodeURIComponent(connector));
     const data = await res.json();
     fmtRender(data);
     _fmtLoaded = true;
@@ -1278,7 +1376,12 @@ async function loadFormat(force = false) {
 // Refresh button
 document.getElementById('fmtRefreshBtn').addEventListener('click', () => {
   _fmtLoaded = false;
-  loadFormat(true);
+  const sel = document.getElementById('fmtCustSelect');
+  if (sel.value) {
+    _loadFormatForConnector(sel.value);
+  } else {
+    loadFormat(true);
+  }
 });
 
 // Collapse / expand a section by clicking (or Enter/Space on) its header

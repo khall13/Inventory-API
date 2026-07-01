@@ -56,25 +56,28 @@ import secrets_box  # encrypt/decrypt/mask helpers
 
 log = logging.getLogger("web.app")
 
-# ── Data whitelist: domain -> raw_table (loaded from endpoints.yaml) ─────────
-def _load_dataset_whitelist() -> dict[str, str]:
-    """Return {domain_name: raw_table} for every domain that declares raw_table."""
+# ── Data whitelist: domain -> {table, connector} (loaded from endpoints.yaml) ─
+def _load_dataset_whitelist() -> dict[str, dict]:
+    """Return {domain_name: {"table": raw_table, "connector": connector}} for every
+    domain that declares raw_table.  The connector falls back to defaults.connector."""
     ep_path = SCRIPTS_DIR / "endpoints.yaml"
     try:
         with ep_path.open() as fh:
             data = yaml.safe_load(fh)
-        whitelist: dict[str, str] = {}
+        default_connector: str = (data.get("defaults") or {}).get("connector", "")
+        whitelist: dict[str, dict] = {}
         for domain in data.get("domains", []):
             name = domain.get("name")
             raw_table = domain.get("raw_table")
             if name and raw_table:
-                whitelist[name] = raw_table
+                connector = domain.get("connector") or default_connector
+                whitelist[name] = {"table": raw_table, "connector": connector}
         return whitelist
     except Exception as exc:
         log.warning("Failed to load endpoints.yaml for data whitelist: %s", exc)
         return {}
 
-_DATASET_WHITELIST: dict[str, str] = _load_dataset_whitelist()
+_DATASET_WHITELIST: dict[str, dict] = _load_dataset_whitelist()
 
 # ── app factory ───────────────────────────────────────────────────────────────
 app = FastAPI(title="Inventory API — Setup Console", docs_url=None, redoc_url=None)
@@ -671,16 +674,59 @@ def _table_identifier(raw_table: str) -> psycopg2.sql.Composed:
     )
 
 
+@app.get("/api/customers")
+async def list_customers(request: Request):
+    """Return [{id, customer_name, connector, environment, business_unit, enabled}]
+    ordered by customer_name, sourced from config.connections.
+
+    Never returns secrets.  On any DB error returns [] (200) — never 500.
+
+    Note on connector-scoped filtering: raw tables are currently tagged only by
+    connector, not by individual connection row.  Filtering the Data and Format
+    panels by the selected customer's connector is correct today (one customer per
+    connector).  If multiple customers share a connector in future, raw tables would
+    need a connection_id column — that is out of scope here.
+    """
+    guard = _require_api_auth(request)
+    if guard:
+        return guard
+    try:
+        db_conn = _db.connect()
+        try:
+            with db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT id, customer_name, connector, environment, business_unit, enabled "
+                    "FROM config.connections ORDER BY customer_name"
+                )
+                rows = [_row_to_dict(r) for r in cur.fetchall()]
+        finally:
+            db_conn.close()
+        for row in rows:
+            row["id"] = str(row["id"])
+        return JSONResponse(rows)
+    except Exception as exc:
+        log.warning("list_customers failed: %s", exc)
+        return JSONResponse([])
+
+
 @app.get("/api/data/datasets")
-async def list_datasets(request: Request):
-    """Return [{dataset, table, count}] for every whitelisted domain."""
+async def list_datasets(request: Request, connector: str | None = None):
+    """Return [{dataset, table, connector, count}] for whitelisted domains.
+
+    When *connector* is provided only domains whose connector matches are returned.
+    Without connector all domains are returned (backward-compat; the FE always passes one).
+    """
     guard = _require_api_auth(request)
     if guard:
         return guard
 
     result = []
     for domain_name in sorted(_DATASET_WHITELIST):
-        raw_table = _DATASET_WHITELIST[domain_name]
+        entry = _DATASET_WHITELIST[domain_name]
+        raw_table = entry["table"]
+        domain_connector = entry["connector"]
+        if connector and domain_connector != connector:
+            continue
         count = 0
         db_conn = None
         try:
@@ -705,7 +751,7 @@ async def list_datasets(request: Request):
         finally:
             if db_conn:
                 db_conn.close()
-        result.append({"dataset": domain_name, "table": raw_table, "count": count})
+        result.append({"dataset": domain_name, "table": raw_table, "connector": domain_connector, "count": count})
 
     return JSONResponse(result)
 
@@ -717,9 +763,10 @@ async def preview_dataset(dataset: str, request: Request, limit: int = 50):
     if guard:
         return guard
 
-    raw_table = _DATASET_WHITELIST.get(dataset)
-    if raw_table is None:
+    _entry = _DATASET_WHITELIST.get(dataset)
+    if _entry is None:
         return JSONResponse({"detail": "dataset not found"}, status_code=404)
+    raw_table = _entry["table"]
 
     limit = max(1, min(limit, 500))
 
@@ -787,20 +834,49 @@ _EMPTY_FORMAT_PAYLOAD: dict = {
 
 
 @app.get("/api/format/preview")
-async def format_preview(request: Request):
-    """Return landed MenuWorks data in TastEOS item format (stock/inventory/service/menu)."""
+async def format_preview(request: Request, connector: str | None = None):
+    """Return landed source data in TastEOS item format (stock/inventory/service/menu).
+
+    *connector* selects which transform to run:
+      - "menuworks" (default when omitted) → transform_mw_precitaste.build(conn)
+      - "crunchtime" → transform_precitaste.build(conn) if available
+      - anything else → graceful empty payload
+
+    Preserving the no-connector default keeps existing tests passing.
+    """
     guard = _require_api_auth(request)
     if guard:
         return guard
 
+    # Default to menuworks for backward compat when FE omits the param
+    effective_connector = connector or "menuworks"
+
     db_conn = None
     try:
-        import transform_mw_precitaste as _transform  # lazy import — pulls yaml/db
-        db_conn = _db.connect()
-        payload = _transform.build(db_conn)
-        return JSONResponse(payload)
+        if effective_connector == "menuworks":
+            import transform_mw_precitaste as _transform  # lazy import
+            db_conn = _db.connect()
+            payload = _transform.build(db_conn)
+            return JSONResponse(payload)
+        elif effective_connector == "crunchtime":
+            try:
+                import transform_precitaste as _ct_transform
+                if hasattr(_ct_transform, "build"):
+                    db_conn = _db.connect()
+                    payload = _ct_transform.build(db_conn)
+                    return JSONResponse(payload)
+            except ImportError:
+                pass
+            # No build() available yet — return graceful empty payload
+            result = dict(_EMPTY_FORMAT_PAYLOAD)
+            result["note"] = "crunchtime transform not yet implemented"
+            return JSONResponse(result)
+        else:
+            result = dict(_EMPTY_FORMAT_PAYLOAD)
+            result["note"] = f"no transform available for connector '{effective_connector}'"
+            return JSONResponse(result)
     except Exception as exc:
-        log.warning("format_preview failed: %s", exc)
+        log.warning("format_preview failed (connector=%s): %s", effective_connector, exc)
         result = dict(_EMPTY_FORMAT_PAYLOAD)
         result["error"] = str(exc)
         return JSONResponse(result)
@@ -819,9 +895,10 @@ async def export_dataset_csv(dataset: str, request: Request):
     if guard:
         return guard
 
-    raw_table = _DATASET_WHITELIST.get(dataset)
-    if raw_table is None:
+    _entry = _DATASET_WHITELIST.get(dataset)
+    if _entry is None:
         return JSONResponse({"detail": "dataset not found"}, status_code=404)
+    raw_table = _entry["table"]
 
     _empty_csv = StreamingResponse(
         iter([""]),
