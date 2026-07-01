@@ -75,6 +75,15 @@ def upsert_raw(conn, domain: str, raw_table: str, rows: list[tuple], run_at) -> 
     if not rows:
         return stats
 
+    # Collapse duplicate natural keys within this batch (keep the last occurrence). A single
+    # page can legitimately repeat a key — e.g. MenuWorks menu items recur per location/date
+    # under the same id — and Postgres rejects an ON CONFLICT that touches a row twice in one
+    # statement (CardinalityViolation).
+    _by_key = {}
+    for r in rows:
+        _by_key[str(r[0])] = r
+    rows = list(_by_key.values())
+
     keys = [str(r[0]) for r in rows]
     with conn.cursor() as cur:
         cur.execute(

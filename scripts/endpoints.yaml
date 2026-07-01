@@ -77,19 +77,26 @@ domains:
     # mrn_batch_size: 100    # mrns per Stage-2 filter call
     # detail_include: {...}  # override DEFAULT_INCLUDE in sync_menuworks_ingredients.py
 
-  # Menu items: 3.0 /menu_items also requires a filter (400 "Filter is a required parameter"),
-  # but its filter shape is UNCONFIRMED (likely date/location-based, not mrns — menu_items are
-  # menu-plan rows, not catalog products). DISABLED until a live sample confirms the filter, so
-  # `--domain all` does not 400. Re-enable with a dedicated handler once the filter is known.
-  # - name: mw_menu_items
-  #   connector: menuworks
-  #   handler: sync_menuworks_menu_items    # TODO: build once filter shape confirmed
-  #   records_key: data.menuItems
-  #   natural_key_path: id
-  #   label_path: name
-  #   raw_table: raw.mw_menu_items
-  #   supports_incremental: false
-  #   mode: full
+  # Menu items: 3.0 /menu_items requires a filter — confirmed shape is a DATE WINDOW
+  # (options.filter.startDate + days), NOT mrns (2026-06-30 probe). It's a normal paged
+  # endpoint (no handler). natural_key = id (a menu-item id recurs per date/location, so the
+  # upsert dedups to one row per menu item). The menu-item `mrn` links to the sold recipe.
+  # NOTE: startDate is a static window here — make it a rolling window (handler computing
+  # today) for the production daily sync.
+  - name: mw_menu_items
+    connector: menuworks
+    path: /v3/business_units/-1/menu_items
+    records_key: data.menuItems
+    page_size: 100
+    natural_key_path: id
+    label_path: name
+    raw_table: raw.mw_menu_items
+    supports_incremental: false
+    mode: full
+    extra_params:
+      filter:
+        startDate: "2026-06-01"
+        days: 90
 
   # Recipes: NO bulk detail endpoint → two-stage list→detail handler (ADR 0002).
   - name: mw_recipes

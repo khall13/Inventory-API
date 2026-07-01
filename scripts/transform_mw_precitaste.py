@@ -34,6 +34,20 @@ def _num(v):
         return None
 
 
+def _norm_mrn(m):
+    """Normalize an mrn for cross-table matching. MenuWorks menu_items carry mrns as
+    floats ('176908.0'); recipes carry '101770' or genuinely fractional '102806.1'.
+    Strip a trailing '.0' but preserve real decimals: '176908.0'->'176908', '102806.1' kept."""
+    if m is None:
+        return None
+    s = str(m)
+    try:
+        f = float(s)
+        return str(int(f)) if f.is_integer() else s
+    except ValueError:
+        return s
+
+
 def _raw_payloads(conn, table: str) -> list[dict]:
     """Return payloads from a raw.* table, or [] if it doesn't exist yet."""
     import psycopg2.errors
@@ -55,7 +69,8 @@ def build(conn) -> dict:
     m = yaml.safe_load(MAPPING_FILE.read_text())
     unit_map = {k.upper(): v for k, v in m.get("unit_map", {}).items()}
     defaults = m.get("defaults", {})
-    report = {"unmapped_units": set(), "zero_qty": [], "unresolved_mrn": set(), "counts": {}}
+    report = {"unmapped_units": set(), "zero_qty": [], "unresolved_mrn": set(),
+              "menu_recipe_unsynced": 0, "counts": {}}
 
     def to_unit(name):
         if not name:
@@ -70,9 +85,14 @@ def build(conn) -> dict:
     for u in _raw_payloads(conn, "raw.mw_units_of_measure"):
         if u.get("id") is not None:
             uom_by_id[str(u["id"])] = u.get("name")
-    menu_mrns = {str(mi.get("mrn")) for mi in _raw_payloads(conn, "raw.mw_menu_items")
-                 if mi.get("mrn") is not None}
-    recipes = {str(r["mrn"]): r for r in _raw_payloads(conn, "raw.mw_recipes") if r.get("mrn")}
+    # Menu items ARE the sold tier. Dedup by normalized mrn (a menu-item id recurs per
+    # date/location; the mrn identifies the sold product). Keep the first record per mrn.
+    menu_by_mrn: dict[str, dict] = {}
+    for mi in _raw_payloads(conn, "raw.mw_menu_items"):
+        mn = _norm_mrn(mi.get("mrn"))
+        if mn and mn not in menu_by_mrn:
+            menu_by_mrn[mn] = mi
+    recipes = {_norm_mrn(r["mrn"]): r for r in _raw_payloads(conn, "raw.mw_recipes") if r.get("mrn")}
 
     # Stock = ingredient mrns referenced by recipes that are NOT themselves recipes, deduped.
     stock: dict[str, dict] = {}
@@ -80,7 +100,7 @@ def build(conn) -> dict:
     def contains_for(recipe: dict) -> list[dict]:
         out = []
         for i, ing in enumerate(recipe.get("ingredients") or [], 1):
-            mrn = str(ing.get("mrn")) if ing.get("mrn") is not None else None
+            mrn = _norm_mrn(ing.get("mrn"))
             name = ing.get("name")
             qty = _num(ing.get("quantity"))
             if not qty:
@@ -98,24 +118,35 @@ def build(conn) -> dict:
                 report["unresolved_mrn"].add(mrn)
         return out
 
+    menu_unit = defaults.get("menu_unit", "Each")
     inventory, menu = [], []
-    for mrn, r in recipes.items():
-        name = r.get("name") or mrn
-        contains = contains_for(r)
-        if mrn in menu_mrns:
-            menu.append({"display_name": name, "unit": defaults.get("menu_unit", "Each"),
-                         "contains": contains})
+
+    # ── MENU tier: one item per distinct sold menu-item mrn ──────────────────
+    # If the referenced recipe is landed, use its build tree; otherwise the menu item
+    # still shows (name + unit) and is flagged so we know to sync that recipe.
+    for mn, mi in menu_by_mrn.items():
+        r = recipes.get(mn)
+        if r:
+            menu.append({"display_name": r.get("name") or mi.get("name") or mn,
+                         "unit": menu_unit, "contains": contains_for(r)})
         else:
-            portion_unit = to_unit(r.get("standardPortionUnitName"))
-            inventory.append({
-                "display_name": name,
-                "unit": defaults.get("inventory_production_unit", "Recipe"),
-                "on_hand_unit": portion_unit,
-                "unit_conversion_factor": _num(r.get("yield")) or 1,
-                "shelf_life": None,            # MenuWorks recipe carries no shelf life → set on review
-                "increment_step": 0.25, "increment_by_one": False,
-                "contains": contains,
-            })
+            menu.append({"display_name": mi.get("name") or mn,
+                         "unit": menu_unit, "contains": []})
+            report["menu_recipe_unsynced"] += 1
+
+    # ── INVENTORY tier: recipes that are NOT sold menu items (prep/components) ─
+    for mn, r in recipes.items():
+        if mn in menu_by_mrn:
+            continue
+        inventory.append({
+            "display_name": r.get("name") or mn,
+            "unit": defaults.get("inventory_production_unit", "Recipe"),
+            "on_hand_unit": to_unit(r.get("standardPortionUnitName")),
+            "unit_conversion_factor": _num(r.get("yield")) or 1,
+            "shelf_life": None,            # MenuWorks recipe carries no shelf life → set on review
+            "increment_step": 0.25, "increment_by_one": False,
+            "contains": contains_for(r),
+        })
 
     result = {"stock": list(stock.values()), "inventory": inventory, "service": [], "menu": menu}
     report["counts"] = {k: len(v) for k, v in result.items()}
