@@ -70,7 +70,7 @@ def build(conn) -> dict:
     unit_map = {k.upper(): v for k, v in m.get("unit_map", {}).items()}
     defaults = m.get("defaults", {})
     report = {"unmapped_units": set(), "zero_qty": [], "unresolved_mrn": set(),
-              "menu_recipe_unsynced": 0, "counts": {}}
+              "menu_recipe_unsynced": 0, "subrecipe_unsynced": 0, "counts": {}}
 
     def to_unit(name):
         if not name:
@@ -94,14 +94,18 @@ def build(conn) -> dict:
             menu_by_mrn[mn] = mi
     recipes = {_norm_mrn(r["mrn"]): r for r in _raw_payloads(conn, "raw.mw_recipes") if r.get("mrn")}
 
-    # Stock = ingredient mrns referenced by recipes that are NOT themselves recipes, deduped.
+    # Stock = LEAF ingredients (type=Ingredient). Sub-recipes referenced as ingredients
+    # (type=Recipe) are prep items, NOT stock — tracked here so unlanded ones can be emitted
+    # as Inventory rather than mis-filed as Stock.
     stock: dict[str, dict] = {}
+    subrecipe_refs: dict[str, str] = {}   # normalized mrn -> name, for type=Recipe ingredients
 
     def contains_for(recipe: dict) -> list[dict]:
         out = []
         for i, ing in enumerate(recipe.get("ingredients") or [], 1):
             mrn = _norm_mrn(ing.get("mrn"))
             name = ing.get("name")
+            is_subrecipe = str(ing.get("type") or "").lower() == "recipe"
             qty = _num(ing.get("quantity"))
             if not qty:
                 report["zero_qty"].append(f"{recipe.get('mrn')}:{name}")
@@ -111,8 +115,13 @@ def build(conn) -> dict:
             unit_name = uom_by_id.get(str(ing.get("unitId"))) if ing.get("unitId") is not None else None
             out.append({"ingredient": name, "unit": to_unit(unit_name),
                         "yields": yields, "order": i})
-            # Register a Stock item for leaf ingredients (mrn not a recipe).
-            if mrn and mrn not in recipes and name and name not in stock:
+            if is_subrecipe:
+                # A sub-recipe: it belongs to the Inventory tier, never Stock. If its detail
+                # isn't landed yet, remember it so we emit an Inventory placeholder below.
+                if mrn and mrn not in recipes:
+                    subrecipe_refs.setdefault(mrn, name)
+            elif mrn and mrn not in recipes and name and name not in stock:
+                # Leaf ingredient (type=Ingredient) → Stock.
                 stock[name] = {"display_name": name, "unit": to_unit(unit_name), "shelf_life": None}
             elif mrn and mrn not in recipes and not name:
                 report["unresolved_mrn"].add(mrn)
@@ -147,6 +156,24 @@ def build(conn) -> dict:
             "increment_step": 0.25, "increment_by_one": False,
             "contains": contains_for(r),
         })
+
+    # ── Sub-recipes referenced (type=Recipe) but not yet landed → Inventory placeholders ──
+    # These are prep items whose detail hasn't been synced; show them correctly (not as Stock),
+    # with empty contains + a flag, so a follow-up recipe sync fills in their build tree.
+    for mn, nm in subrecipe_refs.items():
+        if mn in recipes or mn in menu_by_mrn:
+            continue
+        inventory.append({
+            "display_name": nm or mn,
+            "unit": defaults.get("inventory_production_unit", "Recipe"),
+            "on_hand_unit": defaults.get("stock_unit", "Each"),
+            "unit_conversion_factor": 1,
+            "shelf_life": None,
+            "increment_step": 0.25, "increment_by_one": False,
+            "contains": [],
+            "_unsynced": True,
+        })
+        report["subrecipe_unsynced"] += 1
 
     result = {"stock": list(stock.values()), "inventory": inventory, "service": [], "menu": menu}
     report["counts"] = {k: len(v) for k, v in result.items()}
