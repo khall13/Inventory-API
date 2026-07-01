@@ -77,14 +77,14 @@ domains:
     # mrn_batch_size: 100    # mrns per Stage-2 filter call
     # detail_include: {...}  # override DEFAULT_INCLUDE in sync_menuworks_ingredients.py
 
-  # Menu items: 3.0 /menu_items requires a filter — confirmed shape is a DATE WINDOW
-  # (options.filter.startDate + days), NOT mrns (2026-06-30 probe). It's a normal paged
-  # endpoint (no handler). natural_key = id (a menu-item id recurs per date/location, so the
-  # upsert dedups to one row per menu item). The menu-item `mrn` links to the sold recipe.
-  # NOTE: startDate is a static window here — make it a rolling window (handler computing
-  # today) for the production daily sync.
+  # Menu items: 3.0 /menu_items requires a DATE-WINDOW filter (options.filter.startDate + days),
+  # NOT mrns (2026-06-30 probe). The handler computes a ROLLING window from the run date
+  # (startDate = today - lookback_days, days = window_days) so it never goes stale. natural_key
+  # = id (a menu-item id recurs per date/location; the batch-dedup upsert collapses to one row
+  # per menu item). The menu-item `mrn` links to the sold recipe (see transform_mw_precitaste).
   - name: mw_menu_items
     connector: menuworks
+    handler: sync_menuworks_menu_items      # computes the rolling date window
     path: /v3/business_units/-1/menu_items
     records_key: data.menuItems
     page_size: 100
@@ -93,10 +93,8 @@ domains:
     raw_table: raw.mw_menu_items
     supports_incremental: false
     mode: full
-    extra_params:
-      filter:
-        startDate: "2026-06-01"
-        days: 90
+    # lookback_days: 30    # startDate = today - this
+    # window_days: 120     # filter.days
 
   # Recipes: NO bulk detail endpoint → two-stage list→detail handler (ADR 0002).
   - name: mw_recipes
